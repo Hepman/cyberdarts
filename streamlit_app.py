@@ -55,11 +55,10 @@ def get_win_streak(username, match_df):
         return " 🔥"
     return ""
 
-# --- 4. SIDEBAR ---
+# --- 4. SIDEBAR (Login & Passwort Reset) ---
 with st.sidebar:
     st.title("🎯 CyberDarts")
     
-    # Prüfen, ob bereits ein User in der Session ist
     if st.session_state.user:
         st.write(f"Login: **{st.session_state.user.email}**")
         if st.button("Abmelden"):
@@ -67,26 +66,32 @@ with st.sidebar:
             st.session_state.user = None
             st.rerun()
     else:
-        # Nur wenn kein User da ist, das Login-Formular zeigen
         with st.form("login"):
             le = st.text_input("E-Mail")
             lp = st.text_input("Passwort", type="password")
-            login_submitted = st.form_submit_button("Einloggen")
-            
-            if login_submitted:
+            if st.form_submit_button("Einloggen"):
                 try:
                     res = conn.client.auth.sign_in_with_password({"email": le, "password": lp})
-                    # Wenn erfolgreich, User setzen und sofort RERUN
                     if res.user:
                         st.session_state.user = res.user
                         st.rerun()
-                except Exception as e:
-                    # Fehlermeldung nur zeigen, wenn der Login-Versuch wirklich gescheitert ist
-                    st.error("Login fehlgeschlagen. Bitte Daten prüfen.")
+                except:
+                    st.error("Login fehlgeschlagen.")
+        
+        # Kleiner Bereich für Passwort-Reset
+        with st.expander("🔑 Passwort vergessen?"):
+            reset_email = st.text_input("E-Mail für Reset")
+            if st.button("Reset-Link senden"):
+                try:
+                    conn.client.auth.reset_password_for_email(reset_email)
+                    st.info("Falls die E-Mail existiert, wurde ein Link versendet.")
+                except:
+                    st.error("Fehler beim Senden.")
 
     st.markdown("---")
     with st.expander("⚖️ Impressum"):
         st.caption("Sascha Heptner\nRömerstr. 1, 79725 Laufenburg\nsascha@cyberdarts.de")
+
 # --- 5. DATEN LADEN ---
 players = conn.table("profiles").select("*").execute().data or []
 matches = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
@@ -106,64 +111,45 @@ with t1:
         html += '<tr style="border-bottom:2px solid #00d4ff; text-align:left;"><th>Rang</th><th>Spieler</th><th>Elo</th><th>Matches</th><th>Trend</th></tr>'
         for i, r in enumerate(df_players.itertuples(), 1):
             icon = "🥇" if i==1 else "🥈" if i==2 else "🥉" if i==3 else f"{i}."
-            m_df_desc = m_df.iloc[::-1] # Neueste zuerst für Trend/Streak
+            m_df_desc = m_df.iloc[::-1]
             streak = get_win_streak(r.username, m_df_desc)
             trend = get_trend(r.username, m_df_desc)
             style = "color:white; font-weight:bold;" if i<=3 else ""
             html += f'<tr style="border-bottom:1px solid #1a1c23;{style}"><td>{icon}</td><td>{r.username}{streak}</td><td>{r.elo_score}</td><td>{r.games_played}</td><td style="letter-spacing:2px;">{trend}</td></tr>'
         st.markdown(html + '</table>', unsafe_allow_html=True)
 
-        # --- MULTI-SPIELER ELO VERLAUFS-CHART ---
+        # Multi-Vergleich
         st.divider()
         st.subheader("📈 Elo-Vergleich")
         all_usernames = [p['username'] for p in players]
-        selected_players = st.multiselect("Spieler zum Vergleichen auswählen", all_usernames, default=all_usernames[:1] if all_usernames else [])
-        
+        selected_players = st.multiselect("Spieler zum Vergleichen", all_usernames, default=all_usernames[:1] if all_usernames else [])
         if selected_players:
-            # Wir erstellen ein DataFrame für den Chart
             chart_data = pd.DataFrame()
-            
-            for player in selected_players:
-                history = [1200]
-                current_elo = 1200
-                player_matches = m_df[(m_df['winner_name'] == player) | (m_df['loser_name'] == player)]
-                
-                for _, row in player_matches.iterrows():
-                    if row['winner_name'] == player:
-                        current_elo += row['elo_diff']
-                    else:
-                        current_elo -= row['elo_diff']
-                    history.append(current_elo)
-                
-                # Jede Historie als Spalte hinzufügen
-                temp_df = pd.DataFrame(history, columns=[player])
-                chart_data = pd.concat([chart_data, temp_df], axis=1)
-            
-            # Index als "Anzahl Spiele" benennen
-            chart_data.index.name = "Matches"
-            # Den Chart zeichnen
+            for p in selected_players:
+                hist = [1200]
+                curr = 1200
+                p_m = m_df[(m_df['winner_name'] == p) | (m_df['loser_name'] == p)]
+                for _, row in p_m.iterrows():
+                    curr = curr + row['elo_diff'] if row['winner_name'] == p else curr - row['elo_diff']
+                    hist.append(curr)
+                chart_data = pd.concat([chart_data, pd.DataFrame(hist, columns=[p])], axis=1)
             st.line_chart(chart_data)
-        else:
-            st.info("Wähle mindestens einen Spieler aus, um den Verlauf zu sehen.")
-
-    else: st.info("Keine Spieler gefunden.")
 
 # --- TAB 2: MATCH MELDEN ---
 with t2:
     if not st.session_state.user: st.warning("Bitte einloggen.")
     else:
         if "booking_success" not in st.session_state: st.session_state.booking_success = False
-        url = st.text_input("AutoDarts Match Link")
+        url = st.text_input("AutoDarts Link")
         if url:
             m_id_search = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_search:
                 mid = m_id_search.group(1)
                 match_exists = any(m['id'] == mid for m in matches)
-                
                 if not match_exists and not st.session_state.booking_success:
                     p_map = {p['username']: p for p in players}
                     w, l = st.selectbox("Gewinner", sorted(p_map.keys())), st.selectbox("Verlierer", sorted(p_map.keys()))
-                    if st.button("Ergebnis jetzt buchen"):
+                    if st.button("Buchen"):
                         if w != l:
                             pw, pl = p_map[w], p_map[l]
                             nw, nl, diff = calculate_elo(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'])
@@ -172,24 +158,21 @@ with t2:
                             conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": diff, "url": url}).execute()
                             st.session_state.booking_success = True
                             st.rerun()
-                        else: st.error("Gleicher Spieler gewählt!")
                 elif st.session_state.booking_success:
                     st.success("✅ Match erfolgreich verbucht!")
-                    if st.button("Nächstes Match eintragen"):
+                    if st.button("Nächstes Match"):
                         st.session_state.booking_success = False
                         st.rerun()
-                else: st.info(f"ℹ️ Dieses Match wurde bereits gewertet.")
+                else: st.info("ℹ️ Match wurde bereits gewertet.")
 
 # --- TAB 3: HISTORIE ---
 with t3:
-    st.write("### 📅 Letzte Matches")
-    if matches:
-        for m in matches[::-1][:15]: # Neueste zuerst anzeigen
-            diff = m.get('elo_diff', 0)
-            c1, c2 = st.columns([4, 1])
-            c1.markdown(f"**{m['winner_name']}** bezwingt {m['loser_name']} <span class='badge'>+{diff} Elo</span>", unsafe_allow_html=True)
-            if m.get('url'): c2.link_button("Report 🔗", m['url'])
-            st.divider()
+    for m in matches[::-1][:15]:
+        diff = m.get('elo_diff', 0)
+        c1, c2 = st.columns([4, 1])
+        c1.markdown(f"**{m['winner_name']}** vs {m['loser_name']} <span class='badge'>+{diff} Elo</span>", unsafe_allow_html=True)
+        if m.get('url'): c2.link_button("Report 🔗", m['url'])
+        st.divider()
 
 # --- TAB 4: REGISTRIERUNG ---
 with t4:
