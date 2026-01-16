@@ -129,7 +129,58 @@ with t1:
             
             Alle Spieler starten mit **1200 Punkten**. Das System sorgt dafür, dass die Rangliste fair bleibt, da "Upset-Siege" stärker belohnt werden als Pflichtsiege.
             """)
-            [Image of Elo rating system formula]
+            
     else: st.info("Noch keine Spieler registriert.")
 
-#
+# --- TAB 2: MATCH MELDEN ---
+with t2:
+    if not st.session_state.user: st.warning("Bitte einloggen, um ein Match zu melden.")
+    else:
+        st.write("### ⚔️ Ergebnis eintragen")
+        url = st.text_input("AutoDarts Link (Copy & Paste)")
+        if url:
+            found = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
+            if found:
+                mid = found.group(1)
+                p_names = sorted([p['username'] for p in players])
+                w = st.selectbox("Gewinner auswählen", p_names)
+                l = st.selectbox("Verlierer auswählen", p_names)
+                if st.button("Ergebnis jetzt buchen"):
+                    if w != l:
+                        pw = next(p for p in players if p['username']==w)
+                        pl = next(p for p in players if p['username']==l)
+                        nw, nl, diff = calculate_elo_v2(pw['elo_score'], pl['elo_score'])
+                        
+                        # Updates in Datenbank
+                        conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
+                        conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
+                        conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": diff, "url": url}).execute()
+                        
+                        st.success(f"Spiel gespeichert! {w} erhält +{diff} Punkte.")
+                        st.rerun()
+                    else: st.error("Du kannst nicht gegen dich selbst spielen!")
+
+# --- TAB 3: HISTORIE ---
+with t3:
+    st.write("### 📅 Letzte Matches")
+    for m in matches[:15]:
+        c1, c2 = st.columns([4, 1])
+        c1.write(f"**{m['winner_name']}** vs {m['loser_name']} (+{m.get('elo_diff',0)} Elo)")
+        if m.get('url'): c2.link_button("Report", m['url'])
+        st.divider()
+
+# --- TAB 4: REGISTRIERUNG ---
+with t4:
+    if not st.session_state.user:
+        st.write("### 👤 Neuen Account erstellen")
+        with st.form("reg_form"):
+            e = st.text_input("E-Mail Adresse")
+            p = st.text_input("Passwort (min. 6 Zeichen)", type="password")
+            u = st.text_input("CyberDarts Spielername")
+            if st.form_submit_button("Registrieren"):
+                try:
+                    res = conn.client.auth.sign_up({"email": e, "password": p})
+                    conn.table("profiles").insert({"id": res.user.id, "username": u, "elo_score": 1200, "games_played": 0}).execute()
+                    st.success("Account erstellt! Logge dich jetzt in der Sidebar ein.")
+                except Exception as err: st.error(f"Fehler: {err}")
+    else: st.info("Du bist bereits eingeloggt.")
