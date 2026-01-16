@@ -7,7 +7,6 @@ import re
 # --- 1. KONFIGURATION & DESIGN ---
 st.set_page_config(page_title="CyberDarts", layout="wide", page_icon="🎯")
 
-# Cyber-Branding & UI-Optimierung
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117; color: #00d4ff; }
@@ -62,21 +61,23 @@ with tab1:
         df.columns = ["Spieler", "Elo-Punkte", "Spiele"]
         st.table(df.reset_index(drop=True))
     else:
-        st.info("Noch keine Spieler registriert. Gehe zum Tab 'Registrierung'.")
+        st.info("Noch keine Spieler registriert.")
 
 # --- TAB 2: VALIDIERTER MATCH-IMPORT ---
 with tab2:
     st.write("### ⚔️ Match-Ergebnis erfassen")
-    st.info("Nur offizielle AutoDarts-Links werden akzeptiert.")
+    st.info("Akzeptiert Links von autodarts.io und play.autodarts.io")
     
-    m_url = st.text_input("AutoDarts Match-Link", placeholder="https://autodarts.io/matches/...")
+    m_url = st.text_input("AutoDarts Match-Link", placeholder="https://play.autodarts.io/history/matches/...")
     
     if m_url:
-        # 1. Herkunfts-Check
-        if "autodarts.io/matches/" not in m_url.lower():
-            st.error("❌ Ungültiger Link. Der Link muss von 'autodarts.io/matches/' stammen.")
+        # 1. Herkunfts-Check (jetzt flexibler)
+        is_autodarts = "autodarts.io" in m_url.lower() and "/matches/" in m_url.lower()
+        
+        if not is_autodarts:
+            st.error("❌ Ungültiger Link. Der Link muss ein Match-Link von AutoDarts sein.")
         else:
-            # ID extrahieren
+            # ID extrahieren (nimmt den letzten Teil der URL)
             m_id = m_url.strip().rstrip('/').split('/')[-1].split('?')[0]
             
             # 2. UUID-Format-Check (8-4-4-4-12 Zeichen)
@@ -84,13 +85,13 @@ with tab2:
             if not re.match(uuid_regex, m_id.lower()):
                 st.error(f"❌ Ungültige Match-ID Struktur: `{m_id}`. Das ist kein echtes Match.")
             else:
-                # 3. Datenbank-Check (Duplikate verhindern)
+                # 3. Datenbank-Check
                 check = conn.table("matches").select("*").eq("id", m_id).execute()
                 
                 if check.data:
                     st.warning(f"🚫 Match bereits gewertet (ID: {m_id})")
                 elif len(players) >= 2:
-                    st.success("✅ Match-Format verifiziert.")
+                    st.success(f"✅ Gültiges Match erkannt (ID: {m_id})")
                     
                     p_names = sorted([p['username'] for p in players])
                     c1, c2 = st.columns(2)
@@ -107,7 +108,6 @@ with tab2:
                             nw, nl = calculate_elo(p_w['elo_score'], p_l['elo_score'], True)
                             diff = nw - p_w['elo_score']
                             
-                            # Updates
                             conn.table("profiles").update({"elo_score": nw, "games_played": p_w['games_played']+1}).eq("id", p_w['id']).execute()
                             conn.table("profiles").update({"elo_score": nl, "games_played": p_l['games_played']+1}).eq("id", p_l['id']).execute()
                             
@@ -121,26 +121,20 @@ with tab2:
                             st.rerun()
                         else:
                             st.error("Bitte wähle zwei unterschiedliche Spieler aus.")
-                else:
-                    st.warning("Mindestens 2 registrierte Spieler benötigt.")
 
 # --- TAB 3: STATISTIK ---
 with tab3:
     st.write("### Elo-Verlauf")
     if recent_matches and players:
         sel_p = st.selectbox("Spieler wählen", [p['username'] for p in players])
-        
         hist = [{"Zeit": "Start", "Elo": 1200}]
         for m in reversed(recent_matches):
             if m['winner_name'] == sel_p:
                 hist.append({"Zeit": m['created_at'], "Elo": m['winner_elo_after']})
             elif m['loser_name'] == sel_p:
                 hist.append({"Zeit": m['created_at'], "Elo": m['loser_elo_after']})
-        
         if len(hist) > 1:
             st.line_chart(pd.DataFrame(hist).set_index("Zeit"))
-        else:
-            st.info("Keine Daten für diesen Spieler vorhanden.")
 
 # --- TAB 4: REGISTRIERUNG ---
 with tab4:
