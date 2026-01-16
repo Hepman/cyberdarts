@@ -10,20 +10,19 @@ st.markdown("""
     .stApp { background-color: #0e1117; color: #00d4ff; }
     h1, h3 { color: #00d4ff; text-shadow: 0 0 10px #00d4ff; }
     .stTabs [data-baseweb="tab"] { color: white; }
+    [data-testid="stMetricValue"] { color: #00d4ff; }
     </style>
     """, unsafe_allow_html=True)
 
-# Verbindung zur Datenbank (Manuelle Absicherung)
+# Verbindung zur Datenbank
 try:
-    # Wir versuchen die Verbindung manuell mit den Secrets zu füttern
     url = st.secrets["connections"]["supabase"]["url"]
     key = st.secrets["connections"]["supabase"]["key"]
-    
     conn = st.connection("supabase", type=SupabaseConnection, url=url, key=key)
-    st.sidebar.success("✅ Verbindung zu CyberDarts steht!")
+    st.sidebar.success("✅ CyberDarts Online")
 except Exception as e:
-    st.error("⚠️ Verbindung konnte nicht hergestellt werden. Bitte prüfe die Secrets in Streamlit.")
-    st.stop() # Stoppt die App hier, damit wir nicht in weitere Fehler laufen
+    st.error("⚠️ Verbindung fehlgeschlagen.")
+    st.stop()
 
 st.title("🎯 CyberDarts")
 
@@ -32,13 +31,18 @@ tab1, tab2, tab3 = st.tabs(["🏆 Rangliste", "⚔️ Herausforderungen", "👤 
 with tab1:
     st.write("### Top Spieler")
     try:
-        # Daten abrufen
-        response = conn.query("*", table="profiles", ttl="0").execute()
+        # KORREKTUR: Daten abrufen mit .table().select()
+        response = conn.table("profiles").select("*").execute()
         players = response.data
         
         if players:
-            # Tabelle anzeigen
-            st.dataframe(players, use_container_width=True)
+            # Daten für die Anzeige aufbereiten
+            import pandas as pd
+            df = pd.DataFrame(players)
+            # Nur wichtige Spalten zeigen und sortieren
+            df = df[["username", "autodarts_name", "elo_score"]].sort_values(by="elo_score", ascending=False)
+            df.columns = ["Spieler", "AutoDarts ID", "Elo-Punkte"]
+            st.table(df)
         else:
             st.info("Noch keine Spieler registriert. Sei der Erste!")
     except Exception as e:
@@ -46,18 +50,20 @@ with tab1:
 
 with tab3:
     st.write("### Registrierung")
-    with st.form("reg_form"):
-        new_user = st.text_input("Dein Spielername")
-        new_auto = st.text_input("Dein AutoDarts Name")
-        submit = st.form_submit_button("Bei CyberDarts anmelden")
+    with st.form("reg_form", clear_on_submit=True):
+        new_user = st.text_input("Dein Wunsch-Name (für die Rangliste)")
+        new_auto = st.text_input("Dein exakter AutoDarts Name")
+        submit = st.form_submit_button("Jetzt registrieren")
         
-        if submit and new_user and new_auto:
-            try:
-                # Neuen Spieler einfügen
-                conn.table("profiles").insert([
-                    {"username": new_user, "autodarts_name": new_auto, "elo_score": 1200}
-                ]).execute()
-                st.success(f"Willkommen {new_user}! Klicke auf 'Rangliste', um dich zu sehen.")
-                st.balloons() # Ein kleiner Feiereffekt
-            except Exception as e:
-                st.error(f"Fehler: {e}")
+        if submit:
+            if new_user and new_auto:
+                try:
+                    conn.table("profiles").insert([
+                        {"username": new_user, "autodarts_name": new_auto, "elo_score": 1200}
+                    ]).execute()
+                    st.success(f"Willkommen {new_user}! Bitte lade die Seite neu, um dich in der Liste zu sehen.")
+                    st.balloons()
+                except Exception as e:
+                    st.error(f"Fehler: Eventuell ist der Name schon vergeben.")
+            else:
+                st.warning("Bitte fülle beide Felder aus.")
