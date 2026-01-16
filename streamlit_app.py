@@ -50,7 +50,9 @@ with tab1:
 with tab2:
     st.write("### Match eintragen")
     
-    # Erfolgsmeldung anzeigen
+    # 1. Debug-Info (nur für dich zur Kontrolle, ob alle da sind)
+    st.write(f"Gefundene Spieler im System: {len(players)}")
+    
     if 'last_result' in st.session_state:
         st.success(st.session_state.last_result)
         if st.button("OK, weiter"):
@@ -58,45 +60,48 @@ with tab2:
             st.rerun()
 
     if len(players) >= 2:
-        # Wir sortieren die Namen alphabetisch
-        names = sorted([p['username'] for p in players])
+        # Wir holen die Namen und stellen sicher, dass sie sauber sind
+        names = sorted([p['username'] for p in players if p['username']])
         
-        with st.form("match_form_v3"):
-            # Auswahl des Gewinners
-            w_selected = st.selectbox("Wer hat GEWONNEN?", names, index=0)
+        # Das Formular
+        with st.form("match_form_v4", clear_on_submit=True):
+            # Gewinner wählen
+            w_selected = st.selectbox("Wer hat GEWONNEN?", options=names, key="winner_select")
             
-            # Auswahl des Verlierers (alle außer dem gewählten Gewinner)
-            remaining_names = [n for n in names if n != w_selected]
-            l_selected = st.selectbox("Wer hat VERLOREN?", remaining_names, index=0)
+            # Verlierer-Liste: Wir nehmen einfach ALLE Namen
+            # Die Sperre, sich selbst zu wählen, machen wir erst beim Speichern-Klick
+            l_selected = st.selectbox("Wer hat VERLOREN?", options=names, key="loser_select")
             
             if st.form_submit_button("Sieg speichern"):
-                # Datenbank-Abfrage für beide Spieler
-                w_query = conn.table("profiles").select("*").eq("username", w_selected).execute()
-                l_query = conn.table("profiles").select("*").eq("username", l_selected).execute()
-                
-                if w_query.data and l_query.data:
-                    w_data = w_query.data[0]
-                    l_data = l_query.data[0]
+                if w_selected == l_selected:
+                    st.error("Ein Spieler kann nicht gegen sich selbst gewinnen. Bitte wähle zwei verschiedene Personen.")
+                else:
+                    # Der Rest bleibt gleich (Datenbank-Abfrage und Speichern)
+                    w_query = conn.table("profiles").select("*").eq("username", w_selected).execute()
+                    l_query = conn.table("profiles").select("*").eq("username", l_selected).execute()
                     
-                    # Elo berechnen
-                    new_w_elo, new_l_elo = calculate_elo(w_data['elo_score'], l_data['elo_score'], True)
-                    diff = new_w_elo - w_data['elo_score']
-                    
-                    # Updates in die DB
-                    conn.table("profiles").update({"elo_score": new_w_elo, "games_played": w_data['games_played'] + 1}).match({"id": w_data['id']}).execute()
-                    conn.table("profiles").update({"elo_score": new_l_elo, "games_played": l_data['games_played'] + 1}).match({"id": l_data['id']}).execute()
-                    
-                    # In Historie schreiben
-                    conn.table("matches").insert({
-                        "winner_name": w_selected, 
-                        "loser_name": l_selected, 
-                        "elo_diff": diff,
-                        "winner_elo_after": new_w_elo, 
-                        "loser_elo_after": new_l_elo
-                    }).execute()
-                    
-                    st.session_state.last_result = f"🎯 {w_selected} schlägt {l_selected} (+{diff})"
-                    st.rerun()
+                    if w_query.data and l_query.data:
+                        w_data = w_query.data[0]
+                        l_data = l_query.data[0]
+                        
+                        new_w_elo, new_l_elo = calculate_elo(w_data['elo_score'], l_data['elo_score'], True)
+                        diff = new_w_elo - w_data['elo_score']
+                        
+                        # Datenbank Updates
+                        conn.table("profiles").update({"elo_score": new_w_elo, "games_played": w_data['games_played'] + 1}).match({"id": w_data['id']}).execute()
+                        conn.table("profiles").update({"elo_score": new_l_elo, "games_played": l_data['games_played'] + 1}).match({"id": l_data['id']}).execute()
+                        
+                        # Historie
+                        conn.table("matches").insert({
+                            "winner_name": w_selected, "loser_name": l_selected, "elo_diff": diff,
+                            "winner_elo_after": new_w_elo, "loser_elo_after": new_l_elo
+                        }).execute()
+                        
+                        st.session_state.last_result = f"🎯 {w_selected} schlägt {l_selected} (+{diff})"
+                        st.rerun()
+    else:
+        st.warning("Nicht genug Spieler registriert. Aktuell gefunden: " + str(len(players)))
+        
 with tab3:
     st.write("### Elo Verlauf")
     if recent_matches:
