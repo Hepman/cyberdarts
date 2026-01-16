@@ -97,23 +97,92 @@ recent_matches = conn.table("matches").select("*").order("created_at", desc=True
 st.title("CyberDarts Leaderboard")
 tabs = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung"])
 
-# --- TAB 1: RANGLISTE ---
+# --- TAB 1: RANGLISTE (Hübsche Version) ---
 with tabs[0]:
     if players:
+        # Daten vorbereiten
         df = pd.DataFrame(players).sort_values(by="elo_score", ascending=False)
+        
+        # Rang-Icons vergeben
         ranks = []
         for i in range(1, len(df) + 1):
             if i == 1: ranks.append("🥇")
             elif i == 2: ranks.append("🥈")
             elif i == 3: ranks.append("🥉")
-            else: ranks.append(str(i))
+            else: ranks.append(f"{i}.")
         
         df_display = df[["username", "elo_score", "games_played"]].copy()
-        df_display.columns = ["Spieler", "Elo", "Spiele"]
+        df_display.columns = ["Spieler", "Elo-Punkte", "Spiele"]
         df_display.insert(0, "Rang", ranks)
-        st.table(df_display.set_index("Rang"))
+
+        # CSS für die Tabellen-Optik (Cyber-Style)
+        st.markdown("""
+        <style>
+            .main-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 25px 0;
+                font-size: 0.9em;
+                font-family: sans-serif;
+                min-width: 400px;
+                border-radius: 10px 10px 0 0;
+                overflow: hidden;
+                box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+            }
+            .main-table thead tr {
+                background-color: #00d4ff;
+                color: #000000;
+                text-align: left;
+                font-weight: bold;
+            }
+            .main-table th, .main-table td {
+                padding: 12px 15px;
+            }
+            .main-table tbody tr {
+                border-bottom: 1px solid #1a1c23;
+            }
+            .main-table tbody tr:nth-of-type(even) {
+                background-color: #1a1c23;
+            }
+            .main-table tbody tr:last-of-type {
+                border-bottom: 2px solid #00d4ff;
+            }
+            .top-row {
+                font-weight: bold;
+                color: #00d4ff;
+                font-size: 1.1em;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Tabelle manuell als HTML rendern für maximale Kontrolle
+        html_table = "<table class='main-table'><thead><tr>"
+        for col in df_display.columns:
+            html_table += f"<th>{col}</th>"
+        html_table += "</tr></thead><tbody>"
+
+        for i, row in df_display.iterrows():
+            # Highlight für Top 3
+            special_class = "class='top-row'" if i < 3 else ""
+            html_table += f"<tr {special_class}>"
+            for val in row:
+                html_table += f"<td>{val}</td>"
+            html_table += "</tr>"
+        
+        html_table += "</tbody></table>"
+        
+        st.markdown(html_table, unsafe_allow_html=True)
+
+        # Statistiken unter der Tabelle
+        st.divider()
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Aktive Spieler", len(players))
+        col2.metric("Absolvierte Matches", len(recent_matches))
+        if not df.empty:
+            col3.metric("Spitzen-Elo", df['elo_score'].max(), delta=int(df['elo_score'].max()-1200))
+
     else:
-        st.info("Noch keine Spieler registriert.")
+        st.info("Noch keine Spieler registriert. Sei der Erste!")
 
 # --- TAB 2: MATCH MELDEN ---
 with tabs[1]:
