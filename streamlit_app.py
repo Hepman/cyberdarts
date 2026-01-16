@@ -146,12 +146,28 @@ with tabs[1]:
                             st.success("Erfolgreich gebucht!")
                             st.rerun()
 
-# --- TAB 3: HISTORIE ---
+# --- TAB 3: HISTORIE (Mit klickbaren Match-Links) ---
 with tabs[2]:
+    st.write("### 📅 Letzte Matches")
     if recent_matches:
-        for m in recent_matches[:10]:
-            st.write(f"📅 {m['created_at'][:10]} | **{m['winner_name']}** vs {m['loser_name']} (+{m.get('elo_diff', 0)})")
+        for m in recent_matches[:20]: # Zeigt die letzten 20 Matches
+            c1, c2 = st.columns([3, 1])
+            
+            with c1:
+                # Datum und Match-Info
+                date_str = m['created_at'][:10] if m['created_at'] else "Unbekannt"
+                st.write(f"📅 {date_str} | **{m['winner_name']}** vs {m['loser_name']} (`+{m.get('elo_diff', 0)}` Elo)")
+            
+            with c2:
+                # Der Link zum AutoDarts Report
+                match_url = m.get('url')
+                if match_url:
+                    st.link_button("🔗 Report", match_url)
+                else:
+                    st.write("---")
             st.divider()
+    else:
+        st.info("Noch keine Spiele in der Historie vorhanden.")
 
 # --- TAB 4: REGISTRIERUNG ---
 with tabs[3]:
