@@ -95,6 +95,6 @@ with tab2:
                         if len(p_list) >= 2:
                             p1_aname = p_list[0].get("name")
                             p2_aname = p_list[1].get("name")
-                            
+                            # Spieler in unserer Datenbank suchen
                             db_p1 = next((p for p in players if p['autodarts_name'] == p1_aname), None)
-                            db_p2 = next((p for p in players if p['autodarts
+                            db_p2 = next((p for p in players if p['autodarts_name'] == p2_aname), None)
