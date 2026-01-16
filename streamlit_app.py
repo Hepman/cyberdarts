@@ -58,57 +58,48 @@ with tab1:
 
 with tab2:
     st.write("### Match via Link melden")
-    m_url = st.text_input("AutoDarts Link einfügen", placeholder="https://autodarts.io/matches/...", key="url_turbo")
+    m_url = st.text_input("AutoDarts Link einfügen", placeholder="https://autodarts.io/matches/...", key="url_v3")
     
     if m_url:
-        # ID sicher extrahieren
         m_id = m_url.strip().rstrip('/').split('/')[-1].split('?')[0]
         
-        # In der Datenbank prüfen, ob ID schon existiert
+        # Wir schauen nach, ob das Match existiert
         check = conn.table("matches").select("*").eq("id", m_id).execute()
         
-        if check.data:
-            st.success(f"✅ Dieses Match (ID: {m_id}) wurde bereits verbucht.")
-            st.info(f"Ergebnis: {check.data[0]['winner_name']} vs {check.data[0]['loser_name']}")
-        elif len(players) >= 2:
-            st.markdown(f"🚩 Match ID: `{m_id}`")
+        # FALL A: Das Match ist neu (nicht in der DB)
+        if not check.data:
+            st.info(f"Neues Match erkannt (ID: {m_id}). Bitte Spieler zuordnen:")
             names = sorted([p['username'] for p in players])
             
-            # Die Auswahlboxen stehen direkt bereit
             col_w, col_l = st.columns(2)
-            with col_w:
-                w_sel = st.selectbox("Wer hat GEWONNEN?", names, key="w_turbo")
-            with col_l:
-                l_sel = st.selectbox("Wer hat VERLOREN?", names, key="l_turbo")
+            w_sel = col_w.selectbox("Gewinner", names, key="w_v3")
+            l_sel = col_l.selectbox("Verlierer", names, key="l_v3")
             
             if st.button("🚀 Match jetzt final speichern"):
-                if w_sel == l_sel:
-                    st.error("Fehler: Ein Spieler kann nicht gegen sich selbst gewinnen.")
-                else:
-                    # Profile für Elo-Berechnung laden
+                if w_sel != l_sel:
                     p_w = next(p for p in players if p['username'] == w_sel)
                     p_l = next(p for p in players if p['username'] == l_sel)
-                    
                     nw, nl = calculate_elo(p_w['elo_score'], p_l['elo_score'], True)
                     diff = nw - p_w['elo_score']
                     
-                    # 1. Profile updaten
+                    # Speichern
                     conn.table("profiles").update({"elo_score": nw, "games_played": p_w['games_played']+1}).eq("id", p_w['id']).execute()
                     conn.table("profiles").update({"elo_score": nl, "games_played": p_l['games_played']+1}).eq("id", p_l['id']).execute()
+                    conn.table("matches").insert({"id": m_id, "winner_name": w_sel, "loser_name": l_sel, "elo_diff": diff, "winner_elo_after": nw, "loser_elo_after": nl}).execute()
                     
-                    # 2. Match in Historie eintragen
-                    conn.table("matches").insert({
-                        "id": m_id, 
-                        "winner_name": w_sel, 
-                        "loser_name": l_sel, 
-                        "elo_diff": diff, 
-                        "winner_elo_after": nw, 
-                        "loser_elo_after": nl
-                    }).execute()
-                    
-                    st.success(f"Match gespeichert! {w_sel} bekommt +{diff} Elo.")
+                    # WICHTIG: Wir setzen einen Erfolgshinweis in den Session-State
+                    st.success(f"✅ Match erfolgreich erfasst! {w_sel} steigt auf {nw} Elo.")
                     st.balloons()
-                    st.rerun()
+                    # Wir verzichten hier auf das st.rerun(), damit du die Meldung lesen kannst!
+                else:
+                    st.error("Gewinner und Verlierer müssen unterschiedlich sein.")
+
+        # FALL B: Das Match existiert bereits
+        else:
+            m_info = check.data[0]
+            st.success("✅ Dieses Match wurde bereits erfolgreich erfasst.")
+            st.markdown(f"**Ergebnis:** {m_info['winner_name']} vs {m_info['loser_name']} (`+{m_info['elo_diff']}` Elo)")
+            st.info("Du kannst den Link jetzt löschen oder ein neues Match eingeben.")
 with tab3:
     st.write("### Elo Verlauf")
     if recent_matches and players:
