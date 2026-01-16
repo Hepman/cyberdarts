@@ -68,55 +68,61 @@ players = conn.table("profiles").select("*").execute().data or []
 matches = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 m_df = pd.DataFrame(matches)
 
-# --- 5. SIDEBAR (Inkl. Saison-Reset) ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("🎯 CyberDarts")
+    
     if st.session_state.user:
-        st.write(f"Eingeloggt: **{st.session_state.user.email}**")
+        current_email = st.session_state.user.email.lower()
+        st.write(f"Eingeloggt: **{current_email}**")
+        
         if st.button("Abmelden"):
             conn.client.auth.sign_out()
             st.session_state.user = None
             st.rerun()
             
-        # --- ADMIN BEREICH ---
-        if st.session_state.user.email == "sascha@cyberdarts.de":
+        # --- ADMIN KONSOLE (Verbesserte Prüfung) ---
+        if current_email == "sascha@cyberdarts.de":
             st.markdown("---")
-            with st.expander("🛠️ Admin-Konsole"):
-                st.subheader("Match-Verwaltung")
+            with st.expander("🛠️ ADMIN KONSOLE", expanded=True):
+                st.subheader("Match löschen")
                 if matches:
-                    m_to_del = st.selectbox("Einzeltes Match löschen", matches[::-1], format_func=lambda x: f"{x['winner_name']} vs {x['loser_name']}")
+                    m_to_del = st.selectbox("Wähle Match", matches[::-1], format_func=lambda x: f"{x['winner_name']} vs {x['loser_name']}")
                     if st.button("Dieses Match löschen"):
                         conn.table("matches").delete().eq("id", m_to_del['id']).execute()
                         st.rerun()
                 
                 st.divider()
-                st.subheader("Saison-Reset")
-                st.warning("Achtung: Dies setzt alle Spieler auf 1200 Elo zurück und löscht alle Matches!")
-                confirm_reset = st.checkbox("Ich bin sicher (Reset bestätigen)")
-                if st.button("SAISON JETZT ZURÜCKSETZEN") and confirm_reset:
-                    # 1. Alle Profile resetten
-                    conn.table("profiles").update({"elo_score": 1200, "games_played": 0}).neq("id", "00000000-0000-0000-0000-000000000000").execute()
-                    # 2. Alle Matches löschen (Filter muss immer gesetzt sein bei .delete() in der lib)
-                    conn.table("matches").delete().neq("id", "none").execute()
-                    st.success("Saison erfolgreich zurückgesetzt!")
+                st.subheader("Saison Reset")
+                st.error("Setzt alle Profile auf 1200 & löscht alle Matches!")
+                confirm = st.checkbox("Ich bestätige den Reset")
+                if st.button("JETZT ZURÜCKSETZEN") and confirm:
+                    conn.table("profiles").update({"elo_score": 1200, "games_played": 0}).neq("username", "system_reserved").execute()
+                    conn.table("matches").delete().neq("winner_name", "system_reserved").execute()
+                    st.success("Reset durchgeführt!")
                     st.rerun()
     else:
-        # Login Formular (wie bisher)
-        with st.form("login"):
-            le, lp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
+        with st.form("login_form"):
+            le = st.text_input("E-Mail").lower()
+            lp = st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
                 try:
                     res = conn.client.auth.sign_in_with_password({"email": le, "password": lp})
                     if res.user:
                         st.session_state.user = res.user
                         st.rerun()
-                except: st.error("Login fehlgeschlagen.")
+                except Exception as e:
+                    # Falls der User eigentlich schon eingeloggt ist (Streamlit-State Fehler)
+                    if "already signed in" in str(e).lower():
+                        st.rerun()
+                    else:
+                        st.error(f"Login-Fehler: {str(e)}")
 
     st.markdown("---")
     with st.expander("⚖️ Impressum"):
         st.caption("Sascha Heptner\nRömerstr. 1, 79725 Laufenburg\nsascha@cyberdarts.de")
 
-# --- 6. TABS (Inkl. Regeln & Personal Stats) ---
+# --- 6. TABS ---
 t1, t2, t3, t4 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung"])
 
 with t1:
@@ -141,7 +147,7 @@ with t1:
                     '<b>Modus:</b> 501 Single In / Double Out<br>'
                     '<b>Distanz:</b> Best of 5 Legs<br>'
                     '<b>Meldung:</b> Nur gültige AutoDarts-Links.<br><br>'
-                    '<i>Fairplay wird vorausgesetzt. Bei Unstimmigkeiten entscheidet die Turnierleitung.</i></div>', unsafe_allow_html=True)
+                    '<i>Fairplay wird vorausgesetzt.</i></div>', unsafe_allow_html=True)
 
     st.divider()
     if st.session_state.user:
@@ -207,5 +213,5 @@ with t4:
             if st.form_submit_button("Registrieren"):
                 try:
                     res = conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
-                    st.success("Registrierung erfolgreich!")
+                    st.success("Registrierung erfolgreich! Bitte logge dich ein.")
                 except Exception as e: st.error(f"Fehler: {str(e)}")
