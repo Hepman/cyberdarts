@@ -52,56 +52,58 @@ with tab1:
 
 with tab2:
     st.write("### Match via Link melden")
-    m_url = st.text_input("AutoDarts Match-Link", placeholder="https://autodarts.io/matches/...", key="url_input")
+    # Wir nutzen einen Key für das Textfeld, um es später leeren zu können
+    m_url = st.text_input("AutoDarts Match-Link", placeholder="https://autodarts.io/matches/...", key="url_input_final")
     
     if m_url:
+        # ID extrahieren
         m_id = m_url.strip().split('/')[-1].split('?')[0]
         
-        # Check ob ID bereits vorhanden
-        check = conn.table("matches").select("id").eq("id", m_id).execute()
+        # WICHTIG: Wir holen die Daten OHNE Cache direkt von Supabase
+        check_res = conn.table("matches").select("id").eq("id", m_id).execute()
         
-        if check.data:
-            st.warning("⚠️ Dieses Match wurde bereits gewertet!")
+        if check_res.data and len(check_res.data) > 0:
+            st.warning(f"⚠️ Das Match mit der ID {m_id} ist bereits in der Datenbank!")
+            st.info("Schau in der Rangliste nach, die Punkte sollten bereits dort sein.")
         elif len(players) >= 2:
-            st.info(f"Match-ID: {m_id} erkannt. Wer hat gespielt?")
-            
-            # Wir holen die Namen alphabetisch
+            st.success(f"Match {m_id} bereit zum Import.")
             names = sorted([p['username'] for p in players])
             
-            # Auswahlboxen AUSSERHALB eines Formulars für bessere Reaktivität
             col_a, col_b = st.columns(2)
-            with col_a:
-                w_sel = st.selectbox("Gewinner", names, key="win_select")
-            with col_b:
-                # Hier zeigen wir alle Namen an, um den "Verschwinden"-Fehler zu vermeiden
-                l_sel = st.selectbox("Verlierer", names, key="los_select")
+            w_sel = col_a.selectbox("Gewinner", names, key="w_final")
+            l_sel = col_b.selectbox("Verlierer", names, key="l_final")
             
-            if st.button("🚀 Match final verbuchen"):
+            if st.button("🚀 Match jetzt verbuchen", key="btn_final"):
                 if w_sel == l_sel:
-                    st.error("Fehler: Gewinner und Verlierer dürfen nicht identisch sein!")
+                    st.error("Gewinner und Verlierer müssen unterschiedlich sein!")
                 else:
-                    # Der Rest bleibt gleich
-                    p_w_res = conn.table("profiles").select("*").eq("username", w_sel).execute()
-                    p_l_res = conn.table("profiles").select("*").eq("username", l_sel).execute()
+                    # Profile laden
+                    p_w = conn.table("profiles").select("*").eq("username", w_sel).execute().data[0]
+                    p_l = conn.table("profiles").select("*").eq("username", l_sel).execute().data[0]
                     
-                    if p_w_res.data and p_l_res.data:
-                        p_w = p_w_res.data[0]
-                        p_l = p_l_res.data[0]
-                        
-                        nw, nl = calculate_elo(p_w['elo_score'], p_l['elo_score'], True)
-                        diff = nw - p_w['elo_score']
-                        
-                        # Datenbank Updates
-                        conn.table("profiles").update({"elo_score": nw, "games_played": p_w['games_played']+1}).eq("id", p_w['id']).execute()
-                        conn.table("profiles").update({"elo_score": nl, "games_played": p_l['games_played']+1}).eq("id", p_l['id']).execute()
-                        
-                        conn.table("matches").insert({
-                            "id": m_id, "winner_name": w_sel, "loser_name": l_sel, 
-                            "elo_diff": diff, "winner_elo_after": nw, "loser_elo_after": nl
-                        }).execute()
-                        
-                        st.success(f"Match verbucht! {w_sel} (+{diff})")
-                        st.rerun()
+                    # Elo berechnen
+                    nw, nl = calculate_elo(p_w['elo_score'], p_l['elo_score'], True)
+                    diff = nw - p_w['elo_score']
+                    
+                    # 1. Update Profile
+                    conn.table("profiles").update({"elo_score": nw, "games_played": p_w['games_played']+1}).eq("id", p_w['id']).execute()
+                    conn.table("profiles").update({"elo_score": nl, "games_played": p_l['games_played']+1}).eq("id", p_l['id']).execute()
+                    
+                    # 2. Match eintragen (ID ist der AutoDarts Link-Teil)
+                    conn.table("matches").insert({
+                        "id": m_id, 
+                        "winner_name": w_sel, 
+                        "loser_name": l_sel, 
+                        "elo_diff": diff, 
+                        "winner_elo_after": nw, 
+                        "loser_elo_after": nl
+                    }).execute()
+                    
+                    st.success(f"Match {m_id} wurde erfolgreich gespeichert!")
+                    # Wir warten kurz und laden dann neu
+                    st.rerun()
+        else:
+            st.error("Bitte registriere erst mindestens 2 Spieler.")
 
 with tab3:
     st.write("### Elo Verlauf")
