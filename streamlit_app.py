@@ -4,7 +4,7 @@ from st_supabase_connection import SupabaseConnection
 # Konfiguration der Seite
 st.set_page_config(page_title="CyberDarts", layout="wide")
 
-# CyberDarts Design (Dark Mode & Neon) - Vereinfachte Version gegen Fehler
+# CyberDarts Design (Dark Mode & Neon)
 st.markdown(
     """
     <style>
@@ -16,9 +16,22 @@ st.markdown(
         color: #00d4ff;
         text-shadow: 0 0 10px #00d4ff;
     }
+    /* Tab-Farben anpassen */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 24px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: #1a1c24;
+        border-radius: 4px 4px 0px 0px;
+        gap: 1px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
     </style>
     """,
-    unsafe_allow_index=True
+    unsafe_allow_html=True
 )
 
 # Verbindung zur Datenbank
