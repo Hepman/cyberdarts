@@ -74,10 +74,10 @@ with st.sidebar:
     with st.expander("⚖️ Rechtliches & Datenschutz"):
         st.markdown("**Impressum**")
         st.caption("""
-        **Betreiber:** [Vorname] [Nachname]  
-        [Straße Hausnummer]  
-        [PLZ] [Ort]  
-        **Kontakt:** [E-Mail Adresse]
+        **Betreiber:** Sascha Heptner  
+        Römerstr. 1  
+        79725 Laufenburg  
+        **Kontakt:** sascha@cyberdarts.de
         """)
         st.divider()
         st.markdown("**Datenschutz**")
