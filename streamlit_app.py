@@ -142,6 +142,8 @@ with tab3:
 # --- TAB 4: REGISTRIERUNG ---
 # --- TAB 4: REGISTRIERUNG ---
 # --- TAB 4: REGISTRIERUNG ---
+# ... Ende von Tab 3 ...
+
 with tab4:
     st.write("### Neuer Spieler")
     with st.form("reg_form_final", clear_on_submit=True):
@@ -151,7 +153,7 @@ with tab4:
         if submit_button and u:
             u_clean = u.strip()
             try:
-                # Prüfen
+                # Prüfen ob User existiert
                 check = conn.table("profiles").select("username").eq("username", u_clean).execute()
                 
                 if check.data and len(check.data) > 0:
@@ -166,7 +168,7 @@ with tab4:
                     st.success(f"✅ {u_clean} hinzugefügt!")
                     st.rerun()
             except Exception as e:
-                st.error("Datenbank-Fehler beim Speichern.")
+                st.error("Datenbank-Fehler.")
 
-# HIER DARF JETZT NICHTS MEHR KOMMEN! 
-# Keine weiteren Befehle außerhalb der Tabs.
+# AB HIER DARF ABSOLUT NICHTS MEHR STEHEN!
+# Lösche alle Zeilen, die hiernach kommen (insbesondere die Zeile 146).
