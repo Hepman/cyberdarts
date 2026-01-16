@@ -50,6 +50,7 @@ with tab1:
 with tab2:
     st.write("### Match eintragen")
     
+    # Erfolgsmeldung anzeigen
     if 'last_result' in st.session_state:
         st.success(st.session_state.last_result)
         if st.button("OK, weiter"):
@@ -57,40 +58,35 @@ with tab2:
             st.rerun()
 
     if len(players) >= 2:
-        # Wir holen die Namen der Spieler
+        # Wir sortieren die Namen alphabetisch
         names = sorted([p['username'] for p in players])
         
-        with st.form("final_safety_form"):
-            w_selected = st.selectbox("Wer hat GEWONNEN?", names, key="win_box")
-            l_selected = st.selectbox("Wer hat VERLOREN?", [n for n in names if n != w_selected], key="los_box")
+        with st.form("match_form_v3"):
+            # Auswahl des Gewinners
+            w_selected = st.selectbox("Wer hat GEWONNEN?", names, index=0)
+            
+            # Auswahl des Verlierers (alle außer dem gewählten Gewinner)
+            remaining_names = [n for n in names if n != w_selected]
+            l_selected = st.selectbox("Wer hat VERLOREN?", remaining_names, index=0)
             
             if st.form_submit_button("Sieg speichern"):
-                # 1. Gewinner EXAKT laden
+                # Datenbank-Abfrage für beide Spieler
                 w_query = conn.table("profiles").select("*").eq("username", w_selected).execute()
-                # 2. Verlierer EXAKT laden
                 l_query = conn.table("profiles").select("*").eq("username", l_selected).execute()
                 
-                if len(w_query.data) == 1 and len(l_query.data) == 1:
+                if w_query.data and l_query.data:
                     w_data = w_query.data[0]
                     l_data = l_query.data[0]
                     
-                    # 3. Elo berechnen
+                    # Elo berechnen
                     new_w_elo, new_l_elo = calculate_elo(w_data['elo_score'], l_data['elo_score'], True)
                     diff = new_w_elo - w_data['elo_score']
                     
-                    # 4. Update Gewinner (Nur wenn ID übereinstimmt)
-                    conn.table("profiles").update({
-                        "elo_score": new_w_elo, 
-                        "games_played": w_data['games_played'] + 1
-                    }).match({"id": w_data['id']}).execute()
+                    # Updates in die DB
+                    conn.table("profiles").update({"elo_score": new_w_elo, "games_played": w_data['games_played'] + 1}).match({"id": w_data['id']}).execute()
+                    conn.table("profiles").update({"elo_score": new_l_elo, "games_played": l_data['games_played'] + 1}).match({"id": l_data['id']}).execute()
                     
-                    # 5. Update Verlierer (Nur wenn ID übereinstimmt)
-                    conn.table("profiles").update({
-                        "elo_score": new_l_elo, 
-                        "games_played": l_data['games_played'] + 1
-                    }).match({"id": l_data['id']}).execute()
-                    
-                    # 6. Historie
+                    # In Historie schreiben
                     conn.table("matches").insert({
                         "winner_name": w_selected, 
                         "loser_name": l_selected, 
@@ -99,13 +95,8 @@ with tab2:
                         "loser_elo_after": new_l_elo
                     }).execute()
                     
-                    st.session_state.last_result = f"✅ Bestätigt: {w_selected} (+{diff}) | {l_selected} (-{diff})"
+                    st.session_state.last_result = f"🎯 {w_selected} schlägt {l_selected} (+{diff})"
                     st.rerun()
-                else:
-                    st.error("Fehler beim Identifizieren der Spieler in der Datenbank!")
-    else:
-        st.warning("Nicht genug Spieler registriert.")
-
 with tab3:
     st.write("### Elo Verlauf")
     if recent_matches:
