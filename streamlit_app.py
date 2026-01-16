@@ -62,59 +62,72 @@ with tab2:
     
     if st.button("🚀 Match-Daten abrufen"):
         if m_url:
-            # Extrahiere die ID aus dem Link
-            m_id = m_url.split('/')[-1]
-            api_url = f"https://api.autodarts.io/ms/matches/{m_id}"
+            # Extrahiere die ID sicher (entfernt Leerzeichen und Parameter)
+            m_id = m_url.strip().split('/')[-1].split('?')[0]
             
-            with st.spinner("Verbinde mit AutoDarts..."):
-                try:
-                    res = requests.get(api_url, timeout=10)
-                    if res.status_code == 200:
-                        m_data = res.json()
-                        players_list = m_data.get("players", [])
-                        winner_name = m_data.get("winner")
-                        
-                        if len(players_list) == 2:
-                            p1_aname = players_list[0].get("name")
-                            p2_aname = players_list[1].get("name")
-                            
-                            # Finde die passenden CyberDarts-Profile via autodarts_name
-                            db_p1 = next((p for p in players if p['autodarts_name'] == p1_aname), None)
-                            db_p2 = next((p for p in players if p['autodarts_name'] == p2_aname), None)
-                            
-                            if db_p1 and db_p2:
-                                # Bestimme Gewinner/Verlierer basierend auf AutoDarts-Daten
-                                if winner_name == p1_aname:
-                                    w_data, l_data = db_p1, db_p2
-                                else:
-                                    w_data, l_data = db_p2, db_p1
-                                
-                                # Elo berechnen
-                                n_w_elo, n_l_elo = calculate_elo(w_data['elo_score'], l_data['elo_score'], True)
-                                diff = n_w_elo - w_data['elo_score']
-                                
-                                # In DB speichern
-                                conn.table("profiles").update({"elo_score": n_w_elo, "games_played": w_data['games_played']+1}).eq("id", w_data['id']).execute()
-                                conn.table("profiles").update({"elo_score": n_l_elo, "games_played": l_data['games_played']+1}).eq("id", l_data['id']).execute()
-                                
-                                # Historie
-                                conn.table("matches").insert({
-                                    "winner_name": w_data['username'], "loser_name": l_data['username'], 
-                                    "elo_diff": diff, "winner_elo_after": n_w_elo, "loser_elo_after": n_l_elo
-                                }).execute()
-                                
-                                st.success(f"✅ Match erkannt! {w_data['username']} besiegt {l_data['username']} (+{diff} Elo)")
-                                st.balloons()
-                                st.rerun()
-                            else:
-                                st.error(f"Spieler nicht zugeordnet! Im Match: '{p1_aname}' & '{p2_aname}'. Prüfe die 'AutoDarts Namen' in der Registrierung!")
+            # Die zwei möglichen API-Pfade von AutoDarts
+            api_paths = [
+                f"https://api.autodarts.io/ms/matches/{m_id}",
+                f"https://api.autodarts.io/gs/matches/{m_id}"
+            ]
+            
+            match_found = False
+            m_data = None
+
+            with st.spinner("Suche Match auf AutoDarts-Servern..."):
+                for url in api_paths:
+                    try:
+                        res = requests.get(url, timeout=5)
+                        if res.status_code == 200:
+                            m_data = res.json()
+                            match_found = True
+                            break # Erfolg! Schleife abbrechen
+                    except Exception:
+                        continue
+
+            if match_found and m_data:
+                players_list = m_data.get("players", [])
+                winner_name = m_data.get("winner")
+                
+                if len(players_list) >= 2:
+                    # Namen aus dem Match
+                    p1_aname = players_list[0].get("name")
+                    p2_aname = players_list[1].get("name")
+                    
+                    # Abgleich mit CyberDarts-Datenbank (via autodarts_name)
+                    db_p1 = next((p for p in players if p.get('autodarts_name') == p1_aname), None)
+                    db_p2 = next((p for p in players if p.get('autodarts_name') == p2_aname), None)
+                    
+                    if db_p1 and db_p2:
+                        # Wer hat laut API gewonnen?
+                        if winner_name == p1_aname:
+                            w_data, l_data = db_p1, db_p2
                         else:
-                            st.warning("Das Match scheint noch nicht abgeschlossen oder ungültig zu sein.")
+                            w_data, l_data = db_p2, db_p1
+                        
+                        # Elo berechnen
+                        n_w_elo, n_l_elo = calculate_elo(w_data['elo_score'], l_data['elo_score'], True)
+                        diff = n_w_elo - w_data['elo_score']
+                        
+                        # Datenbank Updates
+                        conn.table("profiles").update({"elo_score": n_w_elo, "games_played": w_data['games_played']+1}).eq("id", w_data['id']).execute()
+                        conn.table("profiles").update({"elo_score": n_l_elo, "games_played": l_data['games_played']+1}).eq("id", l_data['id']).execute()
+                        
+                        # In Historie schreiben
+                        conn.table("matches").insert({
+                            "winner_name": w_data['username'], "loser_name": l_data['username'], 
+                            "elo_diff": diff, "winner_elo_after": n_w_elo, "loser_elo_after": n_l_elo
+                        }).execute()
+                        
+                        st.success(f"✅ Match importiert! {w_data['username']} besiegt {l_data['username']}")
+                        st.balloons()
+                        st.rerun()
                     else:
-                        st.error(f"AutoDarts API Fehler ({res.status_code}). Match ID evtl. falsch?")
-                except Exception as e:
-                    st.error(f"Verbindungsfehler: {e}")
-        
+                        st.error(f"Spieler-Zuordnung fehlgeschlagen! Gefunden: '{p1_aname}' & '{p2_aname}'. Prüfe, ob diese Namen EXAKT in deiner Spieler-Liste hinterlegt sind.")
+                else:
+                    st.warning("Match-Daten unvollständig (vielleicht noch nicht beendet?).")
+            else:
+                st.error("404: Match wurde auf keinem AutoDarts-Server gefunden. Sicher, dass die ID stimmt?")
 with tab3:
     st.write("### Elo Verlauf")
     if recent_matches:
