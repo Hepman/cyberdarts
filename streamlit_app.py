@@ -138,10 +138,28 @@ with tab3:
             st.line_chart(pd.DataFrame(h).set_index("Zeit")["Elo"])
 
 # --- TAB 4: REGISTRIERUNG ---
+# --- TAB 4: REGISTRIERUNG ---
 with tab4:
     st.write("### Neuer Spieler")
-    with st.form("reg_form"):
-        u = st.text_input("Name")
-        if st.form_submit_button("Speichern") and u:
-            conn.table("profiles").insert({"username": u, "elo_score": 1200, "games_played": 0}).execute()
-            st.rerun()
+    with st.form("reg_form", clear_on_submit=True):
+        u = st.text_input("Name").strip() # .strip() entfernt versehentliche Leerzeichen
+        submit = st.form_submit_button("Speichern")
+        
+        if submit and u:
+            # 1. Prüfen, ob der Name schon existiert
+            existing_user = conn.table("profiles").select("username").eq("username", u).execute()
+            
+            if existing_user.data and len(existing_user.data) > 0:
+                st.error(f"❌ Der Name '{u}' ist bereits vergeben. Bitte wähle einen anderen Namen.")
+            else:
+                try:
+                    # 2. Nur wenn er nicht existiert, wird gespeichert
+                    conn.table("profiles").insert({
+                        "username": u, 
+                        "elo_score": 1200, 
+                        "games_played": 0
+                    }).execute()
+                    st.success(f"✅ Spieler '{u}' erfolgreich registriert!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Ein unerwarteter Fehler ist aufgetreten: {e}")
