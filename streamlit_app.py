@@ -49,4 +49,95 @@ tab1, tab2, tab3, tab4 = st.tabs(["🏆 Rangliste", "🔍 API Scanner", "📈 St
 with tab1:
     st.write("### Aktuelles Leaderboard")
     if players:
-        df = pd.DataFrame(players)[["username", "autodarts_name", "elo_score
+        # Sicherer Umbruch der Spaltennamen
+        cols = ["username", "autodarts_name", "elo_score", "games_played"]
+        df = pd.DataFrame(players)[cols].sort_values(by="elo_score", ascending=False)
+        df.columns = ["Spieler", "AutoDarts Name", "Elo", "Spiele"]
+        st.table(df.reset_index(drop=True))
+    else:
+        st.info("Noch keine Spieler registriert.")
+
+# --- TAB 2: API SCANNER ---
+with tab2:
+    st.write("### 🔍 AutoDarts API Scanner")
+    m_url = st.text_input("Match-Link zum Testen", key="scanner_url")
+    
+    if m_url:
+        m_id = m_url.strip().rstrip('/').split('/')[-1].split('?')[0]
+        
+        try:
+            api_key = st.secrets["autodarts"]["api_key"]
+            board_id = st.secrets["autodarts"]["board_id"]
+
+            header_variants = [
+                {"X-API-KEY": api_key},
+                {"Authorization": f"Bearer {api_key}"},
+                {"x-auth-token": api_key},
+                {"X-Board-Id": board_id, "X-API-KEY": api_key}
+            ]
+
+            url_variants = [
+                f"https://api.autodarts.io/ms/matches/{m_id}",
+                f"https://api.autodarts.io/v1/matches/{m_id}",
+                f"https://api.autodarts.io/hub/matches/{m_id}"
+            ]
+
+            found = False
+            for url in url_variants:
+                for headers in header_variants:
+                    try:
+                        headers["User-Agent"] = "Mozilla/5.0"
+                        res = requests.get(url, headers=headers, timeout=3)
+                        
+                        if res.status_code == 200:
+                            st.success(f"✅ TREFFER! URL: {url}")
+                            st.json(res.json()) 
+                            found = True
+                            break
+                        else:
+                            st.write(f"Test: `{url}` mit `{list(headers.keys())[0]}` -> Status: {res.status_code}")
+                    except Exception as e:
+                        st.write(f"Fehler: {e}")
+                if found: break
+            
+            if not found:
+                st.error("❌ Alle Kombinationen fehlgeschlagen.")
+        except KeyError:
+            st.error("Secrets 'api_key' oder 'board_id' unter [autodarts] fehlen!")
+
+# --- TAB 3: STATISTIK ---
+with tab3:
+    st.write("### Elo-Verlauf")
+    if recent_matches and players:
+        sel_p = st.selectbox("Spieler wählen", [p['username'] for p in players], key="stat_sel")
+        h = [{"Zeit": "Start", "Elo": 1200}]
+        for m in reversed(recent_matches):
+            if m['winner_name'] == sel_p: 
+                h.append({"Zeit": m['created_at'], "Elo": m['winner_elo_after']})
+            elif m['loser_name'] == sel_p: 
+                h.append({"Zeit": m['created_at'], "Elo": m['loser_elo_after']})
+        
+        if len(h) > 1: 
+            st.line_chart(pd.DataFrame(h).set_index("Zeit")["Elo"])
+        else:
+            st.info("Noch keine Matches vorhanden.")
+
+# --- TAB 4: REGISTRIERUNG ---
+with tab4:
+    st.write("### Neuer Spieler")
+    with st.form("reg_form", clear_on_submit=True):
+        u = st.text_input("CyberDarts Name")
+        a = st.text_input("AutoDarts Name")
+        if st.form_submit_button("Registrieren"):
+            if u and a:
+                try:
+                    conn.table("profiles").insert({
+                        "username": u, 
+                        "autodarts_name": a.strip(), 
+                        "elo_score": 1200, 
+                        "games_played": 0
+                    }).execute()
+                    st.success(f"Spieler {u} registriert!")
+                    st.rerun()
+                except:
+                    st.error("Name oder AutoDarts-Name existiert bereits!")
