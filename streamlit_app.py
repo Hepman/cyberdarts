@@ -94,18 +94,22 @@ with t2:
     if not st.session_state.user: 
         st.warning("Bitte einloggen.")
     else:
+        # Initialisiere einen Status-Speicher, falls nicht vorhanden
+        if "booking_success" not in st.session_state:
+            st.session_state.booking_success = False
+
         url = st.text_input("AutoDarts Match Link")
+        
         if url:
             m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_match:
                 mid = m_id_match.group(1)
                 
-                # Check: Ist das Match in den geladenen Daten vorhanden?
+                # Check, ob das Match in der Datenbank existiert
                 match_already_in_db = any(m['id'] == mid for m in matches)
                 
-                if match_already_in_db:
-                    st.info("Dieses Match wurde bereits erfasst und gewertet.")
-                else:
+                # FALL 1: Match ist neu und wurde gerade NICHT erfolgreich gebucht
+                if not match_already_in_db and not st.session_state.booking_success:
                     p_map = {p['username']: p for p in players}
                     w = st.selectbox("Gewinner", sorted(p_map.keys()))
                     l = st.selectbox("Verlierer", sorted(p_map.keys()))
@@ -121,14 +125,24 @@ with t2:
                                 conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                                 conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": diff, "url": url}).execute()
                                 
-                                st.success(f"Erfolg! {w} bekommt +{diff} Punkte.")
-                                # Kleiner Trick: Erst kurz warten, dann rerun, damit der State sauber ist
+                                # Erfolg im Session State merken
+                                st.session_state.booking_success = True
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Fehler beim Speichern: {e}")
                         else: 
                             st.error("Gleicher Spieler gewählt!")
+                
+                # FALL 2: Match wurde gerade eben erfolgreich abgeschickt
+                elif st.session_state.booking_success:
+                    st.success("✅ Match wurde erfolgreich verbucht und die Rangliste aktualisiert!")
+                    if st.button("Nächstes Match eintragen"):
+                        st.session_state.booking_success = False
+                        st.rerun()
 
+                # FALL 3: Match war schon vorher in der Datenbank
+                else:
+                    st.info("ℹ️ Dieses Match (ID: " + mid + ") wurde bereits gewertet.")
 with t3:
     for m in matches[:15]:
         st.write(f"**{m['winner_name']}** vs {m['loser_name']} (+{m.get('elo_diff',0)})")
