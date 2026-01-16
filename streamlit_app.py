@@ -57,15 +57,19 @@ with tab3:
         
         if submit:
             if new_user and new_auto:
-                # Debug-Info: Wir zeigen an, was wir senden
-                # st.write(f"Sende: {new_user}, {new_auto}") 
-                
-                result = conn.table("profiles").insert([
-                    {"username": new_user, "autodarts_name": new_auto, "elo_score": 1200}
-                ]).execute()
-                
-                # Wenn wir hier ankommen, war es erfolgreich
-                st.success(f"Erfolg! {new_user} wurde registriert.")
-                st.balloons()
+                try:
+                    # Wir schicken NUR Username, AutoDarts-Name und Elo
+                    # Die ID erstellt die Datenbank jetzt von selbst!
+                    conn.table("profiles").insert({
+                        "username": new_user, 
+                        "autodarts_name": new_auto, 
+                        "elo_score": 1200
+                    }).execute()
+                    
+                    st.success(f"Erfolg! {new_user} wurde registriert. Bitte lade die Seite neu!")
+                    st.balloons()
+                except Exception as e:
+                    # Jetzt zeigen wir den echten Fehler an, falls noch einer kommt
+                    st.error(f"Fehler-Details: {e}")
             else:
                 st.warning("Bitte fülle beide Felder aus.")
