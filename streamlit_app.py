@@ -68,7 +68,7 @@ players = conn.table("profiles").select("*").execute().data or []
 matches = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 m_df = pd.DataFrame(matches)
 
-# --- 5. SIDEBAR ---
+# --- 5. SIDEBAR (Inkl. Saison-Reset) ---
 with st.sidebar:
     st.title("🎯 CyberDarts")
     if st.session_state.user:
@@ -77,15 +77,31 @@ with st.sidebar:
             conn.client.auth.sign_out()
             st.session_state.user = None
             st.rerun()
+            
+        # --- ADMIN BEREICH ---
         if st.session_state.user.email == "sascha@cyberdarts.de":
             st.markdown("---")
-            with st.expander("🛠️ Admin"):
+            with st.expander("🛠️ Admin-Konsole"):
+                st.subheader("Match-Verwaltung")
                 if matches:
-                    m_to_del = st.selectbox("Match löschen", matches[::-1], format_func=lambda x: f"{x['winner_name']} vs {x['loser_name']}")
-                    if st.button("Löschen"):
+                    m_to_del = st.selectbox("Einzeltes Match löschen", matches[::-1], format_func=lambda x: f"{x['winner_name']} vs {x['loser_name']}")
+                    if st.button("Dieses Match löschen"):
                         conn.table("matches").delete().eq("id", m_to_del['id']).execute()
                         st.rerun()
+                
+                st.divider()
+                st.subheader("Saison-Reset")
+                st.warning("Achtung: Dies setzt alle Spieler auf 1200 Elo zurück und löscht alle Matches!")
+                confirm_reset = st.checkbox("Ich bin sicher (Reset bestätigen)")
+                if st.button("SAISON JETZT ZURÜCKSETZEN") and confirm_reset:
+                    # 1. Alle Profile resetten
+                    conn.table("profiles").update({"elo_score": 1200, "games_played": 0}).neq("id", "00000000-0000-0000-0000-000000000000").execute()
+                    # 2. Alle Matches löschen (Filter muss immer gesetzt sein bei .delete() in der lib)
+                    conn.table("matches").delete().neq("id", "none").execute()
+                    st.success("Saison erfolgreich zurückgesetzt!")
+                    st.rerun()
     else:
+        # Login Formular (wie bisher)
         with st.form("login"):
             le, lp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
@@ -94,23 +110,17 @@ with st.sidebar:
                     if res.user:
                         st.session_state.user = res.user
                         st.rerun()
-                except Exception as e: st.error(f"Login fehlgeschlagen: {str(e)}")
-        with st.expander("🔑 Passwort vergessen?"):
-            reset_email = st.text_input("E-Mail für Reset")
-            if st.button("Link senden"):
-                conn.client.auth.reset_password_for_email(reset_email)
-                st.info("Link versendet.")
+                except: st.error("Login fehlgeschlagen.")
 
     st.markdown("---")
     with st.expander("⚖️ Impressum"):
         st.caption("Sascha Heptner\nRömerstr. 1, 79725 Laufenburg\nsascha@cyberdarts.de")
 
-# --- 6. TABS ---
+# --- 6. TABS (Inkl. Regeln & Personal Stats) ---
 t1, t2, t3, t4 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung"])
 
 with t1:
     col_main, col_rules = st.columns([2, 1])
-    
     with col_main:
         if players:
             st.markdown('<div class="legend-box">🟢 Sieg | 🔴 Niederlage | ⚪ Offen | 🔥 Serie (3 Siege)</div>', unsafe_allow_html=True)
@@ -132,40 +142,25 @@ with t1:
                     '<b>Distanz:</b> Best of 5 Legs<br>'
                     '<b>Meldung:</b> Nur gültige AutoDarts-Links.<br><br>'
                     '<i>Fairplay wird vorausgesetzt. Bei Unstimmigkeiten entscheidet die Turnierleitung.</i></div>', unsafe_allow_html=True)
-        
-        st.markdown('<div class="rule-box"><h3>🧮 Elo-System</h3>'
-                    'Jeder startet bei 1200. Punkte werden basierend auf der Stärke des Gegners berechnet.</div>', unsafe_allow_html=True)
 
     st.divider()
-    
     if st.session_state.user:
         current_profile = next((p for p in players if p['id'] == st.session_state.user.id), None)
         if current_profile:
             p_name = current_profile['username']
             st.subheader(f"📈 Dein Elo-Verlauf ({p_name})")
-            
             hist, curr = [1200], 1200
             p_m = m_df[(m_df['winner_name'] == p_name) | (m_df['loser_name'] == p_name)]
             wins = len(p_m[p_m['winner_name'] == p_name])
             total = len(p_m)
             wr = round((wins/total)*100) if total > 0 else 0
-
             for _, row in p_m.iterrows():
                 curr = curr + row['elo_diff'] if row['winner_name'] == p_name else curr - row['elo_diff']
                 hist.append(curr)
-            
             c_chart, c_stats = st.columns([3, 1])
-            with c_chart:
-                st.line_chart(pd.DataFrame(hist, columns=["Deine Elo"]))
+            with c_chart: st.line_chart(pd.DataFrame(hist, columns=["Deine Elo"]))
             with c_stats:
-                st.markdown(f"""
-                <div class="stat-card">
-                    <small>Matches</small><h3>{total}</h3>
-                    <small>Winrate</small><h3>{wr}%</h3>
-                </div>
-                """, unsafe_allow_html=True)
-    else:
-        st.info("Logge dich ein, um deine persönliche Statistik zu sehen.")
+                st.markdown(f'<div class="stat-card"><small>Matches</small><h3>{total}</h3><small>Winrate</small><h3>{wr}%</h3></div>', unsafe_allow_html=True)
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
