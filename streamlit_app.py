@@ -8,9 +8,13 @@ st.markdown("""<style>.stApp { background-color: #0e1117; color: #00d4ff; } h1,h
 
 @st.cache_resource
 def init_connection():
-    return st.connection("supabase", type=SupabaseConnection, 
-                         url=st.secrets["connections"]["supabase"]["url"], 
-                         key=st.secrets["connections"]["supabase"]["key"])
+    try:
+        return st.connection("supabase", type=SupabaseConnection, 
+                             url=st.secrets["connections"]["supabase"]["url"], 
+                             key=st.secrets["connections"]["supabase"]["key"])
+    except Exception as e:
+        st.error(f"Datenbankverbindung fehlgeschlagen: {e}")
+        return None
 
 conn = init_connection()
 
@@ -22,21 +26,23 @@ def calculate_elo(rating_a, rating_b, winner_is_a, k=32):
     return round(rating_a + k * (0 - prob_a)), round(rating_b + k * (1 - prob_b))
 
 # --- DATEN LADEN ---
-# 1. Spieler laden
-try:
-    players_res = conn.table("profiles").select("*").execute()
-    players = players_res.data or []
-except Exception as e:
-    st.error(f"Fehler beim Laden der Spieler: {e}")
-    players = []
+players = []
+recent_matches = []
 
-# 2. Matches für die Historie laden (mit Sicherheitsnetz)
-try:
-    matches_res = conn.table("matches").select("*").order("created_at", desc=True).limit(5).execute()
-    recent_matches = matches_res.data or []
-except Exception:
-    # Falls die Tabelle noch ganz neu oder leer ist
-    recent_matches = []
+if conn:
+    try:
+        players_res = conn.table("profiles").select("*").execute()
+        players = players_res.data or []
+        
+        matches_res = conn.table("matches").select("*").order("created_at", desc=True).limit(5).execute()
+        recent_matches = matches_res.data or []
+    except Exception as e:
+        st.warning("Hinweis: Einige Daten konnten nicht geladen werden (evtl. Tabelle noch leer).")
+
+# --- HAUPTSEITE ---
+st.title("🎯 CyberDarts")
+tab1, tab2, tab3 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "👤 Registrierung"])
+
 with tab1:
     col1, col2 = st.columns([2, 1])
     
@@ -53,7 +59,7 @@ with tab1:
         st.write("### Letzte Spiele")
         if recent_matches:
             for m in recent_matches:
-                st.markdown(f"**{m['winner_name']}** bezwingt **{m['loser_name']}** \n`+{m['elo_diff']} Elo`")
+                st.markdown(f"**{m['winner_name']}** vs **{m['loser_name']}** \n`+{m['elo_diff']} Elo`")
                 st.divider()
         else:
             st.write("Noch keine Spiele gewertet.")
@@ -83,27 +89,6 @@ with tab2:
                 new_e1, new_e2 = calculate_elo(old_e1, p2['elo_score'], True)
                 diff = new_e1 - old_e1
                 
-                # 1. Profile updaten
+                # In DB speichern
                 conn.table("profiles").update({"elo_score": new_e1, "games_played": p1['games_played']+1}).eq("id", p1['id']).execute()
-                conn.table("profiles").update({"elo_score": new_e2, "games_played": p2['games_played']+1}).eq("id", p2['id']).execute()
-                
-                # 2. Match in Historie schreiben
-                conn.table("matches").insert({
-                    "winner_name": winner_name,
-                    "loser_name": loser_name,
-                    "elo_diff": diff
-                }).execute()
-                
-                st.session_state.last_result = f"🎯 Sieg für {winner_name}! (+{diff} Punkte)"
-                st.rerun()
-    else:
-        st.warning("Es müssen mindestens zwei Spieler registriert sein.")
-
-with tab3:
-    st.write("### Neuer Spieler")
-    with st.form("reg"):
-        u = st.text_input("Dein Spielername")
-        if st.form_submit_button("Speichern") and u:
-            conn.table("profiles").insert({"username": u, "elo_score": 1200, "games_played": 0}).execute()
-            st.success(f"Willkommen {u}!")
-            st.rerun()
+                conn.table("profiles").update({"elo_score": new_e2, "games_played": p2['games_played']+1}).eq("id
