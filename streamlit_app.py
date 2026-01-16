@@ -91,27 +91,43 @@ with t1:
     else: st.info("Keine Spieler.")
 
 with t2:
-    if not st.session_state.user: st.warning("Bitte einloggen.")
+    if not st.session_state.user: 
+        st.warning("Bitte einloggen.")
     else:
         url = st.text_input("AutoDarts Match Link")
         if url:
-            m_id = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
-            if m_id:
-                mid = m_id.group(1)
-                if any(m['id'] == mid for m in matches): st.error("Match existiert bereits.")
+            m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
+            if m_id_match:
+                mid = m_id_match.group(1)
+                
+                # Check: Ist das Match in den geladenen Daten vorhanden?
+                match_already_in_db = any(m['id'] == mid for m in matches)
+                
+                if match_already_in_db:
+                    st.info("Dieses Match wurde bereits erfasst und gewertet.")
                 else:
                     p_map = {p['username']: p for p in players}
-                    w, l = st.selectbox("Gewinner", sorted(p_map.keys())), st.selectbox("Verlierer", sorted(p_map.keys()))
-                    if st.button("Buchen"):
+                    w = st.selectbox("Gewinner", sorted(p_map.keys()))
+                    l = st.selectbox("Verlierer", sorted(p_map.keys()))
+                    
+                    if st.button("Ergebnis jetzt buchen"):
                         if w != l:
                             pw, pl = p_map[w], p_map[l]
                             nw, nl, diff = calculate_elo(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'])
-                            # DB Updates
-                            conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
-                            conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
-                            conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": diff, "url": url}).execute()
-                            st.success("Erfolg!")
-                            st.rerun()
+                            
+                            try:
+                                # DB Updates
+                                conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
+                                conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
+                                conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": diff, "url": url}).execute()
+                                
+                                st.success(f"Erfolg! {w} bekommt +{diff} Punkte.")
+                                # Kleiner Trick: Erst kurz warten, dann rerun, damit der State sauber ist
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Fehler beim Speichern: {e}")
+                        else: 
+                            st.error("Gleicher Spieler gewählt!")
 
 with t3:
     for m in matches[:15]:
