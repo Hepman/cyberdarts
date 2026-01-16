@@ -2,3 +2,4 @@ streamlit
 st-supabase-connection
 requests
 beautifulsoup4
+cloudscraper
