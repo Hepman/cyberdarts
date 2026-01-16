@@ -52,7 +52,7 @@ with tab1:
 
 with tab2:
     st.write("### Match via Link melden")
-    m_url = st.text_input("AutoDarts Match-Link", placeholder="https://autodarts.io/matches/...")
+    m_url = st.text_input("AutoDarts Match-Link", placeholder="https://autodarts.io/matches/...", key="url_input")
     
     if m_url:
         m_id = m_url.strip().split('/')[-1].split('?')[0]
@@ -63,31 +63,45 @@ with tab2:
         if check.data:
             st.warning("⚠️ Dieses Match wurde bereits gewertet!")
         elif len(players) >= 2:
-            st.info(f"Match-ID: {m_id} erkannt.")
+            st.info(f"Match-ID: {m_id} erkannt. Wer hat gespielt?")
+            
+            # Wir holen die Namen alphabetisch
             names = sorted([p['username'] for p in players])
             
-            with st.form("import_form"):
-                c1, c2 = st.columns(2)
-                w_sel = c1.selectbox("Gewinner", names)
-                l_sel = c2.selectbox("Verlierer", [n for n in names if n != w_sel])
-                
-                if st.form_submit_button("Match final verbuchen"):
-                    p_w = conn.table("profiles").select("*").eq("username", w_sel).execute().data[0]
-                    p_l = conn.table("profiles").select("*").eq("username", l_sel).execute().data[0]
+            # Auswahlboxen AUSSERHALB eines Formulars für bessere Reaktivität
+            col_a, col_b = st.columns(2)
+            with col_a:
+                w_sel = st.selectbox("Gewinner", names, key="win_select")
+            with col_b:
+                # Hier zeigen wir alle Namen an, um den "Verschwinden"-Fehler zu vermeiden
+                l_sel = st.selectbox("Verlierer", names, key="los_select")
+            
+            if st.button("🚀 Match final verbuchen"):
+                if w_sel == l_sel:
+                    st.error("Fehler: Gewinner und Verlierer dürfen nicht identisch sein!")
+                else:
+                    # Der Rest bleibt gleich
+                    p_w_res = conn.table("profiles").select("*").eq("username", w_sel).execute()
+                    p_l_res = conn.table("profiles").select("*").eq("username", l_sel).execute()
                     
-                    nw, nl = calculate_elo(p_w['elo_score'], p_l['elo_score'], True)
-                    diff = nw - p_w['elo_score']
-                    
-                    conn.table("profiles").update({"elo_score": nw, "games_played": p_w['games_played']+1}).eq("id", p_w['id']).execute()
-                    conn.table("profiles").update({"elo_score": nl, "games_played": p_l['games_played']+1}).eq("id", p_l['id']).execute()
-                    
-                    conn.table("matches").insert({
-                        "id": m_id, "winner_name": w_sel, "loser_name": l_sel, 
-                        "elo_diff": diff, "winner_elo_after": nw, "loser_elo_after": nl
-                    }).execute()
-                    
-                    st.success(f"Erfolg! {w_sel} steigt auf {nw} Elo.")
-                    st.rerun()
+                    if p_w_res.data and p_l_res.data:
+                        p_w = p_w_res.data[0]
+                        p_l = p_l_res.data[0]
+                        
+                        nw, nl = calculate_elo(p_w['elo_score'], p_l['elo_score'], True)
+                        diff = nw - p_w['elo_score']
+                        
+                        # Datenbank Updates
+                        conn.table("profiles").update({"elo_score": nw, "games_played": p_w['games_played']+1}).eq("id", p_w['id']).execute()
+                        conn.table("profiles").update({"elo_score": nl, "games_played": p_l['games_played']+1}).eq("id", p_l['id']).execute()
+                        
+                        conn.table("matches").insert({
+                            "id": m_id, "winner_name": w_sel, "loser_name": l_sel, 
+                            "elo_diff": diff, "winner_elo_after": nw, "loser_elo_after": nl
+                        }).execute()
+                        
+                        st.success(f"Match verbucht! {w_sel} (+{diff})")
+                        st.rerun()
 
 with tab3:
     st.write("### Elo Verlauf")
