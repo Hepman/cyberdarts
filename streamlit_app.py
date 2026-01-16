@@ -140,31 +140,34 @@ with tab3:
 # --- TAB 4: REGISTRIERUNG ---
 # --- TAB 4: REGISTRIERUNG ---
 # --- TAB 4: REGISTRIERUNG ---
+# --- TAB 4: REGISTRIERUNG ---
 with tab4:
     st.write("### Neuer Spieler")
-    with st.form("reg_form", clear_on_submit=True):
-        u = st.text_input("Name").strip()
-        submit = st.form_submit_button("Speichern")
+    # Wir nutzen ein Formular, damit die App nicht bei jedem Tastendruck neu lädt
+    with st.form("reg_form_final", clear_on_submit=True):
+        u = st.text_input("Name (Username)")
+        submit_button = st.form_submit_button("Speichern")
         
-        if submit and u:
-            try:
-                # 1. Vorab-Check: Existiert der User schon?
-                check = conn.table("profiles").select("username").eq("username", u).execute()
-                
-                if check.data and len(check.data) > 0:
-                    st.warning(f"⚠️ Der Spieler '{u}' existiert bereits in der Rangliste.")
-                else:
-                    # 2. Versuch des Einfügens
-                    res = conn.table("profiles").insert({
-                        "username": u, 
-                        "elo_score": 1200, 
-                        "games_played": 0
-                    }).execute()
+        # WICHTIG: Die Datenbank-Aktion darf NUR innerhalb dieses 'if' stehen!
+        if submit_button:
+            if u and len(u.strip()) > 0:
+                u_clean = u.strip()
+                try:
+                    # Erst prüfen, ob der Name existiert
+                    check = conn.table("profiles").select("username").eq("username", u_clean).execute()
                     
-                    st.success(f"✅ {u} wurde erfolgreich hinzugefügt!")
-                    st.rerun()
-                    
-            except Exception as e:
-                # Hier fangen wir den APIError ab und zeigen eine saubere Meldung
-                st.error(f"Datenbank-Fehler: Der Name ist eventuell schon vergeben oder ungültig.")
-                # Optional: st.write(e) # Nur zum Debuggen aktivieren
+                    if check.data and len(check.data) > 0:
+                        st.warning(f"⚠️ '{u_clean}' ist schon dabei!")
+                    else:
+                        # Jetzt erst einfügen
+                        conn.table("profiles").insert({
+                            "username": u_clean, 
+                            "elo_score": 1200, 
+                            "games_played": 0
+                        }).execute()
+                        st.success(f"✅ {u_clean} wurde hinzugefügt!")
+                        st.rerun()
+                except Exception as e:
+                    st.error("Datenbank-Fehler. Möglicherweise existiert der Name bereits.")
+            else:
+                st.warning("Bitte gib einen Namen ein.")
