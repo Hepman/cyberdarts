@@ -124,8 +124,8 @@ with t1:
 
     with col_rules:
         st.markdown('<div class="rule-box"><h3>📜 Turnierregeln</h3>'
-                    '<b>Modus:</b> 501 Single In / Double Out<br>'
-                    '<b>Distanz:</b> Best of 3 Legs (Saisonabhängig)<br>'
+                    '<b>Modus:</b> 501 Single Out / Double Out<br>'
+                    '<b>Distanz:</b> Best of 5 Legs<br>'
                     '<b>Meldung:</b> Nur gültige AutoDarts-Links.<br><br>'
                     '<i>Fairplay wird vorausgesetzt. Bei Unstimmigkeiten entscheidet die Turnierleitung.</i></div>', unsafe_allow_html=True)
         
@@ -133,26 +133,38 @@ with t1:
                     'Jeder startet bei 1200. Siege gegen stärkere Gegner geben mehr Punkte als Pflichtsiege gegen schwächere Spieler.</div>', unsafe_allow_html=True)
 
     st.divider()
-    st.subheader("📈 Elo-Vergleich")
-    selected = st.multiselect("Spieler zum Vergleich wählen", [p['username'] for p in players], default=[p['username'] for p in players][:1])
-    if selected:
-        chart_data = pd.DataFrame()
-        for p in selected:
+    
+    # --- NUR EIGENE ELO-KURVE ANZEIGEN ---
+    if st.session_state.user:
+        # Finde den Usernamen zum angemeldeten User
+        current_profile = next((p for p in players if p['id'] == st.session_state.user.id), None)
+        
+        if current_profile:
+            st.subheader(f"📈 Dein Elo-Verlauf ({current_profile['username']})")
+            
+            p_name = current_profile['username']
             hist, curr = [1200], 1200
-            p_m = m_df[(m_df['winner_name'] == p) | (m_df['loser_name'] == p)]
+            p_m = m_df[(m_df['winner_name'] == p_name) | (m_df['loser_name'] == p_name)]
+            
             for _, row in p_m.iterrows():
-                curr = curr + row['elo_diff'] if row['winner_name'] == p else curr - row['elo_diff']
+                curr = curr + row['elo_diff'] if row['winner_name'] == p_name else curr - row['elo_diff']
                 hist.append(curr)
-            chart_data = pd.concat([chart_data, pd.DataFrame(hist, columns=[p])], axis=1)
-        st.line_chart(chart_data)
+            
+            chart_data = pd.DataFrame(hist, columns=["Deine Elo"])
+            st.line_chart(chart_data)
+        else:
+            st.info("Profil wird geladen...")
+    else:
+        st.info("Logge dich ein, um deinen persönlichen Elo-Verlauf zu sehen.")
 
 with t2:
+    # ... (Rest des Codes bleibt identisch wie zuvor)
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
     else:
         if "booking_success" not in st.session_state: st.session_state.booking_success = False
         url = st.text_input("AutoDarts Match Link")
         if url:
-            m_id_search = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
+            m_id_search = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_search:
                 mid = m_id_search.group(1)
                 match_exists = any(m['id'] == mid for m in matches)
