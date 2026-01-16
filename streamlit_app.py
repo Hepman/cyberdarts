@@ -22,16 +22,21 @@ def calculate_elo(rating_a, rating_b, winner_is_a, k=32):
     return round(rating_a + k * (0 - prob_a)), round(rating_b + k * (1 - prob_b))
 
 # --- DATEN LADEN ---
-players_res = conn.table("profiles").select("*").execute()
-players = players_res.data or []
+# 1. Spieler laden
+try:
+    players_res = conn.table("profiles").select("*").execute()
+    players = players_res.data or []
+except Exception as e:
+    st.error(f"Fehler beim Laden der Spieler: {e}")
+    players = []
 
-# NEU: Matches für die Historie laden
-matches_res = conn.table("matches").select("*").order("created_at", desc=True).limit(5).execute()
-recent_matches = matches_res.data or []
-
-st.title("🎯 CyberDarts")
-tab1, tab2, tab3 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "👤 Registrierung"])
-
+# 2. Matches für die Historie laden (mit Sicherheitsnetz)
+try:
+    matches_res = conn.table("matches").select("*").order("created_at", desc=True).limit(5).execute()
+    recent_matches = matches_res.data or []
+except Exception:
+    # Falls die Tabelle noch ganz neu oder leer ist
+    recent_matches = []
 with tab1:
     col1, col2 = st.columns([2, 1])
     
