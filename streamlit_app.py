@@ -25,22 +25,37 @@ def calculate_elo(rating_a, rating_b, winner_is_a, k=32):
 players_res = conn.table("profiles").select("*").execute()
 players = players_res.data or []
 
+# NEU: Matches für die Historie laden
+matches_res = conn.table("matches").select("*").order("created_at", desc=True).limit(5).execute()
+recent_matches = matches_res.data or []
+
 st.title("🎯 CyberDarts")
 tab1, tab2, tab3 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "👤 Registrierung"])
 
 with tab1:
-    st.write("### Top Spieler")
-    if players:
-        df = pd.DataFrame(players)[["username", "elo_score", "games_played"]].sort_values(by="elo_score", ascending=False)
-        df.columns = ["Spieler", "Elo", "Matches"]
-        st.table(df.reset_index(drop=True))
-    else:
-        st.info("Noch keine Spieler registriert.")
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.write("### Top Spieler")
+        if players:
+            df = pd.DataFrame(players)[["username", "elo_score", "games_played"]].sort_values(by="elo_score", ascending=False)
+            df.columns = ["Spieler", "Elo", "Matches"]
+            st.table(df.reset_index(drop=True))
+        else:
+            st.info("Noch keine Spieler registriert.")
+
+    with col2:
+        st.write("### Letzte Spiele")
+        if recent_matches:
+            for m in recent_matches:
+                st.markdown(f"**{m['winner_name']}** bezwingt **{m['loser_name']}** \n`+{m['elo_diff']} Elo`")
+                st.divider()
+        else:
+            st.write("Noch keine Spiele gewertet.")
 
 with tab2:
     st.write("### Spielergebnis eintragen")
     
-    # Erfolgsmeldung anzeigen, falls vorhanden
     if 'last_result' in st.session_state:
         st.success(st.session_state.last_result)
         if st.button("Meldung schließen"):
@@ -63,11 +78,17 @@ with tab2:
                 new_e1, new_e2 = calculate_elo(old_e1, p2['elo_score'], True)
                 diff = new_e1 - old_e1
                 
-                # In DB speichern
+                # 1. Profile updaten
                 conn.table("profiles").update({"elo_score": new_e1, "games_played": p1['games_played']+1}).eq("id", p1['id']).execute()
                 conn.table("profiles").update({"elo_score": new_e2, "games_played": p2['games_played']+1}).eq("id", p2['id']).execute()
                 
-                # Ergebnis im Session State speichern
+                # 2. Match in Historie schreiben
+                conn.table("matches").insert({
+                    "winner_name": winner_name,
+                    "loser_name": loser_name,
+                    "elo_diff": diff
+                }).execute()
+                
                 st.session_state.last_result = f"🎯 Sieg für {winner_name}! (+{diff} Punkte)"
                 st.rerun()
     else:
