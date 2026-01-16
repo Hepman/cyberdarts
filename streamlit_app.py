@@ -75,9 +75,9 @@ if st.session_state.user:
     tab_list.append("⚙️ Profil")
 tabs = st.tabs(tab_list)
 
-# --- TAB 1: RANGLISTE ---
+# --- TAB 1: RANGLISTE (Verschönert) ---
 with tabs[0]:
-    st.write("### Elo-Leaderboard")
+    st.write("### 🏆 CyberDarts Leaderboard")
     if players:
         df = pd.DataFrame(players).sort_values(by="elo_score", ascending=False)
         match_df = pd.DataFrame(recent_matches)
@@ -88,12 +88,33 @@ with tabs[0]:
             return f"{round((wins / games) * 100)}%"
 
         df['Winrate'] = df.apply(lambda r: get_win_rate(r['username'], r['games_played']), axis=1)
-        df_display = df[["username", "elo_score", "games_played", "Winrate"]]
+        
+        # Daten für Anzeige vorbereiten
+        df_display = df[["username", "elo_score", "games_played", "Winrate"]].copy()
         df_display.columns = ["Spieler", "Elo", "Spiele", "Quote"]
-        df_display.insert(0, "Rang", range(1, len(df_display) + 1))
+        
+        # Ränge mit Icons versehen
+        ranks = []
+        for i in range(1, len(df_display) + 1):
+            if i == 1: ranks.append("🥇")
+            elif i == 2: ranks.append("🥈")
+            elif i == 3: ranks.append("🥉")
+            else: ranks.append(str(i))
+        
+        df_display.insert(0, "Rang", ranks)
+        
+        # Tabelle anzeigen
         st.table(df_display.set_index("Rang"))
+        
+        # Kleine Statistik-Kachel
+        st.divider()
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Gesamtspieler", len(players))
+        c2.metric("Spiele gesamt", len(recent_matches))
+        if not df.empty:
+            c3.metric("Top Elo", f"{df['elo_score'].max()}")
     else:
-        st.info("Noch keine Profile vorhanden.")
+        st.info("Noch keine Profile vorhanden. Registriere dich als Erster!")
 
 # --- TAB 2: MATCH MELDEN ---
 with tabs[1]:
