@@ -10,8 +10,9 @@ st.markdown("""
 <style>
     .stApp { background-color: #0e1117; color: #00d4ff; }
     h1, h3 { color: #00d4ff; text-shadow: 0 0 10px #00d4ff; }
-    .stButton>button { background-color: #00d4ff; color: black; font-weight: bold; width: 100%; }
+    .stButton>button { background-color: #00d4ff; color: black; font-weight: bold; width: 100%; border-radius: 5px; }
     .stTable { background-color: #1a1c23; color: #00d4ff; }
+    [data-testid="stMetricValue"] { color: #00d4ff !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -40,24 +41,27 @@ if conn:
     except: pass
 
 st.title("🎯 CyberDarts")
-tab1, tab2, tab3, tab4 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📈 Historie", "👤 Registrierung"])
+tab1, tab2, tab3, tab4 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung"])
 
 # --- TAB 1: RANGLISTE ---
 with tab1:
+    st.write("### Elo-Leaderboard")
     if players:
-        df = pd.DataFrame(players)[["username", "elo_score", "games_played"]].sort_values(by="elo_score", ascending=False)
+        cols = ["username", "elo_score", "games_played"]
+        df = pd.DataFrame(players)[cols].sort_values(by="elo_score", ascending=False)
         df.columns = ["Spieler", "Elo", "Spiele"]
         st.table(df.reset_index(drop=True))
+    else:
+        st.info("Noch keine Spieler registriert.")
 
-# --- TAB 2: SICHERES MELDEN (MANUELL) ---
+# --- TAB 2: SICHERES MELDEN (TOS-KONFORM) ---
 with tab2:
-    st.write("### 🛡️ Match manuell melden")
-    st.info("Hinweis: Jeder Link wird gespeichert und ist für alle Spieler einsehbar.")
+    st.write("### ⚔️ Match-Ergebnis eintragen")
+    st.info("Hinweis: Durch die Speicherung der Match-ID ist jeder Link nur einmal verwendbar.")
     
-    m_url = st.text_input("AutoDarts Match-Link (History oder Live)", placeholder="https://play.autodarts.io/...")
+    m_url = st.text_input("AutoDarts Match-Link", placeholder="https://play.autodarts.io/history/matches/...")
     
     if m_url:
-        # ID extrahieren & Validieren
         m_id = m_url.strip().rstrip('/').split('/')[-1].split('?')[0]
         uuid_regex = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         
@@ -68,20 +72,18 @@ with tab2:
             if check.data:
                 st.warning(f"🚫 Dieses Match wurde bereits gewertet.")
             elif len(players) >= 2:
-                st.success(f"✅ Match-ID `{m_id}` verifiziert.")
-                
+                st.success(f"✅ Match-ID `{m_id}` erkannt.")
                 names = sorted([p['username'] for p in players])
-                col1, col2 = st.columns(2)
-                w_sel = col1.selectbox("🏆 Gewinner", names, key="win_manual")
-                l_sel = col2.selectbox("📉 Verlierer", names, key="loss_manual")
+                c1, c2 = st.columns(2)
+                w_sel = c1.selectbox("🏆 Gewinner", names, key="w_m")
+                l_sel = c2.selectbox("📉 Verlierer", names, key="l_m")
                 
-                if st.button("🚀 Match jetzt offiziell eintragen"):
+                if st.button("🚀 Ergebnis offiziell buchen"):
                     if w_sel != l_sel:
                         p_w = next(p for p in players if p['username'] == w_sel)
                         p_l = next(p for p in players if p['username'] == l_sel)
                         nw, nl = calculate_elo(p_w['elo_score'], p_l['elo_score'], True)
                         
-                        # Datenbank-Updates
                         conn.table("profiles").update({"elo_score": nw, "games_played": p_w['games_played']+1}).eq("id", p_w['id']).execute()
                         conn.table("profiles").update({"elo_score": nl, "games_played": p_l['games_played']+1}).eq("id", p_l['id']).execute()
                         
@@ -90,29 +92,32 @@ with tab2:
                             "elo_diff": nw - p_w['elo_score'], "url": m_url
                         }).execute()
                         
-                        st.success("Match erfolgreich gespeichert!")
-                        st.balloons()
+                        st.success("Erfolg! Ranking aktualisiert.")
                         st.rerun()
                     else:
-                        st.error("Gewinner und Verlierer müssen unterschiedlich sein.")
+                        st.error("Bitte wähle zwei verschiedene Spieler.")
 
-# --- TAB 3: HISTORIE (ZUR KONTROLLE) ---
+# --- TAB 3: HISTORIE (SOCIAL PROOF) ---
 with tab3:
-    st.write("### Letzte 10 Matches")
+    st.write("### Letzte Spielbegegnungen")
     if recent_matches:
-        for m in recent_matches[:10]:
-            st.write(f"📅 {m['created_at'][:10]} | **{m['winner_name']}** besiegte **{m['loser_name']}**")
-            st.caption(f"Beweis-Link: {m.get('url', 'Kein Link verfügbar')}")
-            st.divider()
+        for m in recent_matches[:15]:
+            with st.container():
+                c1, c2 = st.columns([3, 1])
+                c1.write(f"🏆 **{m['winner_name']}** vs. {m['loser_name']}")
+                c1.caption(f"Datum: {m['created_at'][:10]} | ID: {m['id']}")
+                c2.link_button("🔗 Zum Match", m.get('url', 'https://autodarts.io'))
+                st.divider()
+    else:
+        st.info("Noch keine Matches vorhanden.")
 
 # --- TAB 4: REGISTRIERUNG ---
 with tab4:
-    st.write("### Spieler-Registrierung")
+    st.write("### Neuer Spieler")
     with st.form("reg"):
-        u = st.text_input("Anzeigename")
+        u = st.text_input("Name")
         if st.form_submit_button("Registrieren") and u:
             try:
                 conn.table("profiles").insert({"username": u, "elo_score": 1200, "games_played": 0}).execute()
-                st.success(f"Spieler {u} angelegt!")
                 st.rerun()
-            except: st.error("Name bereits vergeben.")
+            except: st.error("Name existiert bereits.")
