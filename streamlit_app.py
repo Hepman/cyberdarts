@@ -117,5 +117,12 @@ with tab3:
         sel_p = st.selectbox("Spieler wählen", [p['username'] for p in players], key="stat_sel")
         h = [{"Zeit": "Start", "Elo": 1200}]
         for m in reversed(recent_matches):
-            if m['winner_name'] == sel_p: h.append({"Zeit": m['created_at'], "Elo": m['winner_elo_after']})
-            elif m['loser_name'] == sel_p: h.append({"Zeit": m
+            if m['winner_name'] == sel_p: 
+                h.append({"Zeit": m['created_at'], "Elo": m['winner_elo_after']})
+            elif m['loser_name'] == sel_p: 
+                h.append({"Zeit": m['created_at'], "Elo": m['loser_elo_after']})
+        
+        if len(h) > 1: 
+            st.line_chart(pd.DataFrame(h).set_index("Zeit")["Elo"])
+        else:
+            st.info("Noch keine Spiele für diesen Spieler aufgezeichnet.")
