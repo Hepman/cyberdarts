@@ -56,18 +56,23 @@ with tab2:
     m_url = st.text_input("AutoDarts Match-Link", placeholder="https://autodarts.io/matches/...", key="url_input_final")
     
     if m_url:
-        # ID extrahieren
         m_id = m_url.strip().split('/')[-1].split('?')[0]
         
-        # WICHTIG: Wir holen die Daten OHNE Cache direkt von Supabase
-        check_res = conn.table("matches").select("id").eq("id", m_id).execute()
+        # WICHTIG: Wir laden jetzt ALLE Spalten (*), damit wir Namen und Datum haben
+        check_res = conn.table("matches").select("*").eq("id", m_id).execute()
         
         if check_res.data and len(check_res.data) > 0:
-            # Holen wir uns die Namen aus dem schon existierenden Match
             m_info = check_res.data[0]
-            st.success(f"✅ Dieses Match wurde bereits am {m_info.get('created_at', 'unbekannt')} gewertet.")
-            st.info(f"Ergebnis in der DB: {m_info.get('winner_name')} hat gegen {m_info.get('loser_name')} gewonnen.")
+            # Zeitformatierung für eine schönere Anzeige
+            datum = m_info.get('created_at', 'unbekannt')[:10] 
+            
+            st.success(f"✅ Dieses Match ist bereits im System!")
+            st.info(f"Eingetragen am: **{datum}**")
+            st.markdown(f"🏆 **{m_info.get('winner_name')}** hat gegen **{m_info.get('loser_name')}** gewonnen.")
+            st.markdown(f"📈 Elo-Verschiebung: `+{m_info.get('elo_diff')} Punkte`")
+        
         elif len(players) >= 2:
+            # ... Hier folgt dein restlicher Code zur Eingabe (selectboxen etc.) ...
             # ... hier geht der normale Formular-Code weiter ...
             st.success(f"Match {m_id} bereit zum Import.")
             names = sorted([p['username'] for p in players])
