@@ -39,13 +39,21 @@ with tab1:
         st.write("### Top Spieler")
         if players:
             df = pd.DataFrame(players)[["username", "elo_score", "games_played"]].sort_values(by="elo_score", ascending=False)
+            
+            # --- GOLDENE KRONE LOGIK ---
+            def add_crown(name, index):
+                if index == 0: return f"👑 {name}"
+                return name
+            
+            df = df.reset_index(drop=True)
+            df['username'] = df.apply(lambda row: add_crown(row['username'], row.name), axis=1)
+            
             df.columns = ["Spieler", "Elo", "Matches"]
-            st.table(df.reset_index(drop=True))
-    with col2:
-        st.write("### Letzte Spiele")
-        for m in recent_matches[:5]:
-            st.markdown(f"**{m['winner_name']}** vs **{m['loser_name']}** \n`+{m['elo_diff']} Elo`")
-            st.divider()
+            
+            # NEU: Den Index um 1 erhöhen, damit die Liste bei 1 startet
+            df.index += 1 
+            
+            st.table(df)
 
 with tab2:
     st.write("### Match eintragen")
