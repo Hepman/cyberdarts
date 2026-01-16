@@ -44,7 +44,7 @@ def calculate_elo(rating_w, rating_l, games_w, games_l):
 def get_trend(username, match_df):
     if match_df.empty: return "⚪" * 10
     u_m = match_df[(match_df['winner_name'] == username) | (match_df['loser_name'] == username)]
-    # Neueste 10 Spiele
+    # Neueste 10 Spiele, umgedreht für richtige Anzeige
     icons = ["🟢" if m['winner_name'] == username else "🔴" for _, m in u_m.tail(10).iloc[::-1].iterrows()]
     res = "".join(icons)
     return res.ljust(10, "⚪")[:10]
@@ -61,29 +61,26 @@ players = conn.table("profiles").select("*").execute().data or []
 matches = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 m_df = pd.DataFrame(matches)
 
-# --- 5. SIDEBAR (Login & Admin) ---
+# --- 5. SIDEBAR (Login & Diagnose) ---
 with st.sidebar:
     st.title("🎯 CyberDarts")
     
     if st.session_state.user:
-        st.write(f"Login: **{st.session_state.user.email}**")
+        st.write(f"Eingeloggt als: **{st.session_state.user.email}**")
         if st.button("Abmelden"):
             conn.client.auth.sign_out()
             st.session_state.user = None
             st.rerun()
             
-        # --- ADMIN BEREICH (Nur für Sascha) ---
+        # Admin-Bereich
         if st.session_state.user.email == "sascha@cyberdarts.de":
             st.markdown("---")
             with st.expander("🛠️ Admin-Konsole"):
-                st.subheader("Match löschen")
                 if matches:
-                    m_to_del = st.selectbox("Match wählen", matches[::-1], format_func=lambda x: f"{x['winner_name']} vs {x['loser_name']} ({x['id'][:8]})")
-                    if st.button("Match permanent löschen"):
-                        # Hinweis: In einer echten ELO-Umgebung müssten Punkte korrigiert werden. 
-                        # Hier löschen wir nur den Eintrag.
+                    m_to_del = st.selectbox("Match löschen", matches[::-1], format_func=lambda x: f"{x['winner_name']} vs {x['loser_name']}")
+                    if st.button("Löschen bestätigen"):
                         conn.table("matches").delete().eq("id", m_to_del['id']).execute()
-                        st.success("Gelöscht! (Elo-Werte bleiben manuell)")
+                        st.success("Match entfernt!")
                         st.rerun()
     else:
         with st.form("login"):
@@ -94,30 +91,35 @@ with st.sidebar:
                     if res.user:
                         st.session_state.user = res.user
                         st.rerun()
-                except: st.error("Login fehlgeschlagen.")
+                except Exception as e:
+                    # Zeigt den exakten Fehler an (z.B. "Email not confirmed")
+                    st.error(f"Login fehlgeschlagen: {str(e)}")
         
         with st.expander("🔑 Passwort vergessen?"):
             reset_email = st.text_input("E-Mail für Reset")
             if st.button("Reset-Link senden"):
                 try:
                     conn.client.auth.reset_password_for_email(reset_email)
-                    st.info("Link wurde (falls Account existiert) versendet.")
-                except: st.error("Fehler.")
+                    st.info("Prüfe dein Postfach (auch Spam).")
+                except Exception as e:
+                    st.error(f"Fehler: {str(e)}")
 
     st.markdown("---")
     with st.expander("⚖️ Impressum"):
         st.caption("Sascha Heptner\nRömerstr. 1, 79725 Laufenburg\nsascha@cyberdarts.de")
 
 # --- 6. PASSWORT RECOVERY MODUS ---
-# Wenn User über Reset-Link kommt
 params = st.query_params
 if "type" in params and params["type"] == "recovery":
     st.info("🔒 Passwort-Wiederherstellung aktiv")
     with st.form("new_pass"):
-        np = st.text_input("Neues Passwort", type="password")
-        if st.form_submit_button("Speichern"):
-            conn.client.auth.update_user({"password": np})
-            st.success("Geändert! Du kannst dich jetzt normal einloggen.")
+        np = st.text_input("Neues Passwort (min. 6 Zeichen)", type="password")
+        if st.form_submit_button("Passwort speichern"):
+            try:
+                conn.client.auth.update_user({"password": np})
+                st.success("Passwort geändert! Bitte logge dich jetzt ein.")
+            except Exception as e:
+                st.error(f"Fehler: {str(e)}")
 
 # --- 7. TABS ---
 t1, t2, t3, t4 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung"])
@@ -127,7 +129,6 @@ with t1:
         st.markdown('<div class="legend-box">🟢 Sieg | 🔴 Niederlage | ⚪ Offen | 🔥 Serie (3 Siege)</div>', unsafe_allow_html=True)
         df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
         
-        # Tabelle
         html = '<table style="width:100%; color:#00d4ff; border-collapse: collapse;">'
         html += '<tr style="border-bottom:2px solid #00d4ff; text-align:left;"><th>Rang</th><th>Spieler</th><th>Elo</th><th>Matches</th><th>Trend</th></tr>'
         for i, r in enumerate(df_players.itertuples(), 1):
@@ -138,24 +139,23 @@ with t1:
             html += f'<tr style="border-bottom:1px solid #1a1c23;{style}"><td>{icon}</td><td>{r.username}{streak}</td><td>{r.elo_score}</td><td>{r.games_played}</td><td style="letter-spacing:2px;">{trend}</td></tr>'
         st.markdown(html + '</table>', unsafe_allow_html=True)
 
-        # Elo-Vergleich
         st.divider()
         st.subheader("📈 Elo-Vergleich")
-        selected = st.multiselect("Spieler wählen", [p['username'] for p in players], default=[p['username'] for p in players][:1])
+        selected = st.multiselect("Spieler zum Vergleich wählen", [p['username'] for p in players], default=[p['username'] for p in players][:1])
         if selected:
             chart_data = pd.DataFrame()
             for p in selected:
-                hist = [1200]
-                curr = 1200
+                hist, curr = [1200], 1200
                 p_m = m_df[(m_df['winner_name'] == p) | (m_df['loser_name'] == p)]
                 for _, row in p_m.iterrows():
                     curr = curr + row['elo_diff'] if row['winner_name'] == p else curr - row['elo_diff']
                     hist.append(curr)
                 chart_data = pd.concat([chart_data, pd.DataFrame(hist, columns=[p])], axis=1)
             st.line_chart(chart_data)
+    else: st.info("Keine Spieler in der Datenbank.")
 
 with t2:
-    if not st.session_state.user: st.warning("Bitte einloggen.")
+    if not st.session_state.user: st.warning("Bitte erst einloggen.")
     else:
         if "booking_success" not in st.session_state: st.session_state.booking_success = False
         url = st.text_input("AutoDarts Match Link")
@@ -167,7 +167,7 @@ with t2:
                 if not match_exists and not st.session_state.booking_success:
                     p_map = {p['username']: p for p in players}
                     w, l = st.selectbox("Gewinner", sorted(p_map.keys())), st.selectbox("Verlierer", sorted(p_map.keys()))
-                    if st.button("Ergebnis jetzt buchen"):
+                    if st.button("Ergebnis buchen"):
                         if w != l:
                             pw, pl = p_map[w], p_map[l]
                             nw, nl, diff = calculate_elo(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'])
@@ -177,19 +177,19 @@ with t2:
                             st.session_state.booking_success = True
                             st.rerun()
                 elif st.session_state.booking_success:
-                    st.success("✅ Match erfolgreich verbucht!")
+                    st.success("✅ Match verbucht!")
                     if st.button("Nächstes Match"):
                         st.session_state.booking_success = False
                         st.rerun()
-                else: st.info(f"ℹ️ Match bereits gewertet.")
+                else: st.info(f"ℹ️ Match {mid} wurde schon gewertet.")
 
 with t3:
-    st.write("### 📅 Letzte Matches")
+    st.write("### 📅 Historie (Letzte 15)")
     for m in matches[::-1][:15]:
         diff = m.get('elo_diff', 0)
         c1, c2 = st.columns([4, 1])
-        c1.markdown(f"**{m['winner_name']}** bezwingt {m['loser_name']} <span class='badge'>+{diff} Elo</span>", unsafe_allow_html=True)
-        if m.get('url'): c2.link_button("Report 🔗", m['url'])
+        c1.markdown(f"**{m['winner_name']}** vs {m['loser_name']} <span class='badge'>+{diff} Elo</span>", unsafe_allow_html=True)
+        if m.get('url'): c2.link_button("Details", m['url'])
         st.divider()
 
 with t4:
@@ -197,5 +197,7 @@ with t4:
         with st.form("reg"):
             re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Anzeigename")
             if st.form_submit_button("Registrieren"):
-                res = conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
-                st.success("Registriert! Logge dich nun ein.")
+                try:
+                    res = conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
+                    st.success("Registrierung erfolgreich! (Prüfe ggf. E-Mails)")
+                except Exception as e: st.error(f"Fehler: {str(e)}")
