@@ -16,31 +16,13 @@ st.markdown("""
     /* Legende Style */
     .legend-box {
         background-color: #1a1c23; 
-        padding: 15px; 
-        border-radius: 8px; 
+        padding: 10px; 
+        border-radius: 5px; 
         border-left: 5px solid #00d4ff; 
         margin-bottom: 20px;
         font-size: 0.9em;
-    }
-
-    /* Tabellen Style */
-    .main-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 10px 0;
         color: #00d4ff;
-        background-color: #0e1117;
     }
-    .main-table thead tr {
-        background-color: #00d4ff;
-        color: #000;
-        text-align: left;
-        font-weight: bold;
-    }
-    .main-table th, .main-table td { padding: 12px 15px; border-bottom: 1px solid #1a1c23; }
-    .main-table tbody tr:hover { background-color: rgba(0, 212, 255, 0.05); }
-    .trend-text { font-family: monospace; letter-spacing: 2px; font-size: 1.1em; }
-    .top-player { color: #ffffff; font-weight: bold; text-shadow: 0 0 5px #00d4ff; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -56,7 +38,7 @@ conn = init_connection()
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# --- 3. ELO & TREND LOGIK ---
+# --- 3. LOGIK-FUNKTIONEN (Elo & Trend) ---
 def calculate_elo_v2(rating_w, rating_l):
     k = 32
     prob_w = 1 / (1 + 10 ** ((rating_l - rating_w) / 400))
@@ -66,12 +48,14 @@ def calculate_elo_v2(rating_w, rating_l):
 def get_trend_icons(username, match_df):
     if match_df.empty:
         return "⚪" * 10
+    # Filtert Matches, wo der User Gewinner ODER Verlierer war
     user_matches = match_df[(match_df['winner_name'] == username) | (match_df['loser_name'] == username)]
     last_10 = user_matches.head(10)
     
     icons = []
     for _, m in last_10.iterrows():
         icons.append("🟢" if m['winner_name'] == username else "🔴")
+    # Auffüllen auf 10
     while len(icons) < 10:
         icons.append("⚪")
     return "".join(icons)
@@ -105,89 +89,114 @@ with st.sidebar:
     with st.expander("⚖️ Rechtliches & Datenschutz"):
         st.markdown("**Impressum**")
         st.caption("""
-        **Betreiber:** [Dein Name]  
+        **Betreiber:** [Vorname Name]  
         [Straße Hausnummer], [PLZ Ort]  
         **E-Mail:** [Deine E-Mail]
         """)
         st.divider()
         st.markdown("**Datenschutz**")
         st.caption("Daten (E-Mail, Elo) werden nur zur Spielverwaltung in Supabase gespeichert.")
+        st.divider()
+        st.caption("CyberDarts ist ein Community-Projekt und steht in keiner Verbindung zu AutoDarts.")
 
 # --- 6. DATEN LADEN ---
-players = conn.table("profiles").select("*").execute().data or []
-recent_matches = conn.table("matches").select("*").order("created_at", desc=True).execute().data or []
-match_df = pd.DataFrame(recent_matches)
+players_data = conn.table("profiles").select("*").execute().data or []
+matches_data = conn.table("matches").select("*").order("created_at", desc=True).execute().data or []
+match_df = pd.DataFrame(matches_data)
 
 # --- 7. TABS ---
-st.title("CyberDarts")
+st.title("CyberDarts Leaderboard")
 tabs = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung"])
 
 # --- TAB 1: RANGLISTE ---
 with tabs[0]:
-    if players:
-        st.markdown(f"""
+    if players_data:
+        # Legende
+        st.markdown("""
         <div class="legend-box">
             <strong>Trend-Legende:</strong> 🟢 Sieg | 🔴 Niederlage | ⚪ Offen (noch keine 10 Spiele)
         </div>
         """, unsafe_allow_html=True)
 
-        df = pd.DataFrame(players).sort_values(by="elo_score", ascending=False)
+        # Daten verarbeiten
+        df = pd.DataFrame(players_data).sort_values(by="elo_score", ascending=False)
         
-        # Tabelle bauen
-        html_table = "<table class='main-table'><thead><tr><th>Rang</th><th>Spieler</th><th>Elo</th><th>Spiele</th><th>Trend (Letzte 10)</th></tr></thead><tbody>"
+        # HTML Tabelle Start
+        html_code = """
+        <table style="width:100%; border-collapse: collapse; color: #00d4ff;">
+            <thead>
+                <tr style="background-color: #00d4ff; color: black; font-weight: bold; border-bottom: 2px solid #00d4ff;">
+                    <th style="padding: 12px; text-align: left;">Rang</th>
+                    <th style="padding: 12px; text-align: left;">Spieler</th>
+                    <th style="padding: 12px; text-align: left;">Elo</th>
+                    <th style="padding: 12px; text-align: left;">Matches</th>
+                    <th style="padding: 12px; text-align: left;">Trend (Letzte 10)</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
         
         for i, row in enumerate(df.itertuples(), 1):
             rank_icon = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
-            row_class = "class='top-player'" if i <= 3 else ""
             trend = get_trend_icons(row.username, match_df)
             
-            html_table += f"""
-            <tr {row_class}>
-                <td>{rank_icon}</td>
-                <td>{row.username}</td>
-                <td>{row.elo_score}</td>
-                <td>{row.games_played}</td>
-                <td class='trend-text'>{trend}</td>
-            </tr>
+            # Highlight Top 3
+            style = "font-weight: bold; color: white; text-shadow: 0 0 5px #00d4ff;" if i <= 3 else ""
+            
+            html_code += f"""
+                <tr style="border-bottom: 1px solid #1a1c23; {style}">
+                    <td style="padding: 12px;">{rank_icon}</td>
+                    <td style="padding: 12px;">{row.username}</td>
+                    <td style="padding: 12px;">{row.elo_score}</td>
+                    <td style="padding: 12px;">{row.games_played}</td>
+                    <td style="padding: 12px; letter-spacing: 2px; font-size: 1.1em;">{trend}</td>
+                </tr>
             """
-        html_table += "</tbody></table>"
-        st.markdown(html_table, unsafe_allow_html=True)
-    else: st.info("Keine Spieler gefunden.")
+        
+        html_code += "</tbody></table>"
+        st.markdown(html_code, unsafe_allow_html=True)
+    else:
+        st.info("Noch keine Spieler registriert.")
 
 # --- TAB 2: MATCH MELDEN ---
 with tabs[1]:
     if not st.session_state.user:
-        st.warning("Bitte einloggen.")
+        st.warning("Bitte einloggen, um ein Match zu melden.")
     else:
-        st.write("### ⚔️ Ergebnis melden")
+        st.write("### ⚔️ Ergebnis eintragen")
         m_url = st.text_input("AutoDarts Match-Link")
         if m_url:
             match_id_res = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', m_url.lower())
             if match_id_res:
                 m_id = match_id_res.group(1)
-                p_names = sorted([p['username'] for p in players])
-                w_sel = st.selectbox("Gewinner", p_names)
-                l_sel = st.selectbox("Verlierer", p_names)
-                if st.button("Spiel eintragen"):
-                    if w_sel != l_sel:
-                        p_w = next(p for p in players if p['username'] == w_sel)
-                        p_l = next(p for p in players if p['username'] == l_sel)
-                        nw, nl, diff = calculate_elo_v2(p_w['elo_score'], p_l['elo_score'])
-                        
-                        conn.table("profiles").update({"elo_score": nw, "games_played": p_w['games_played']+1}).eq("id", p_w['id']).execute()
-                        conn.table("profiles").update({"elo_score": nl, "games_played": p_l['games_played']+1}).eq("id", p_l['id']).execute()
-                        conn.table("matches").insert({"id": m_id, "winner_name": w_sel, "loser_name": l_sel, "elo_diff": diff, "url": m_url}).execute()
-                        st.success("Erfolg!")
-                        st.rerun()
+                check = conn.table("matches").select("id").eq("id", m_id).execute()
+                if check.data:
+                    st.warning("Dieses Match wurde bereits gewertet.")
+                else:
+                    p_names = sorted([p['username'] for p in players_data])
+                    w_sel = st.selectbox("🏆 Gewinner", p_names)
+                    l_sel = st.selectbox("📉 Verlierer", p_names)
+                    if st.button("🚀 Buchen"):
+                        if w_sel != l_sel:
+                            p_w = next(p for p in players_data if p['username'] == w_sel)
+                            p_l = next(p for p in players_data if p['username'] == l_sel)
+                            nw, nl, diff = calculate_elo_v2(p_w['elo_score'], p_l['elo_score'])
+                            
+                            conn.table("profiles").update({"elo_score": nw, "games_played": p_w['games_played']+1}).eq("id", p_w['id']).execute()
+                            conn.table("profiles").update({"elo_score": nl, "games_played": p_l['games_played']+1}).eq("id", p_l['id']).execute()
+                            conn.table("matches").insert({"id": m_id, "winner_name": w_sel, "loser_name": l_sel, "elo_diff": diff, "url": m_url}).execute()
+                            st.success(f"Sieg für {w_sel}! (+{diff})")
+                            st.rerun()
 
 # --- TAB 3: HISTORIE ---
 with tabs[2]:
-    if recent_matches:
-        for m in recent_matches[:15]:
+    if matches_data:
+        for m in matches_data[:15]:
             c1, c2 = st.columns([4, 1])
-            c1.write(f"**{m['winner_name']}** vs {m['loser_name']} (+{m.get('elo_diff', 0)} Elo)")
+            c1.write(f"**{m['winner_name']}** besiegt {m['loser_name']} (+{m.get('elo_diff', 0)})")
             if m.get('url'): c2.link_button("Report", m['url'])
             st.divider()
+    else: st.info("Keine Spiele gefunden.")
 
 # --- TAB 4: REGISTRIERUNG ---
 with tabs[3]:
@@ -196,7 +205,9 @@ with tabs[3]:
             r_email = st.text_input("E-Mail")
             r_pass = st.text_input("Passwort (min. 6)", type="password")
             r_user = st.text_input("Username")
-            if st.form_submit_button("Registrieren"):
-                res = conn.client.auth.sign_up({"email": r_email, "password": r_pass})
-                conn.table("profiles").insert({"id": res.user.id, "username": r_user, "elo_score": 1200, "games_played": 0}).execute()
-                st.success("Erfolgreich! Bitte einloggen.")
+            if st.form_submit_button("Account erstellen"):
+                try:
+                    res = conn.client.auth.sign_up({"email": r_email, "password": r_pass})
+                    conn.table("profiles").insert({"id": res.user.id, "username": r_user, "elo_score": 1200, "games_played": 0}).execute()
+                    st.success("Erfolgreich! Bitte jetzt einloggen.")
+                except Exception as e: st.error(f"Fehler: {e}")
