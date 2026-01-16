@@ -79,41 +79,65 @@ with st.sidebar:
 
 # --- 5. DATEN LADEN ---
 players = conn.table("profiles").select("*").execute().data or []
-matches = conn.table("matches").select("*").order("created_at", desc=True).execute().data or []
+matches = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 m_df = pd.DataFrame(matches)
 
 # --- 6. TABS ---
 t1, t2, t3, t4 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung"])
 
-# --- TAB 1: RANGLISTE ---
+# --- TAB 1: RANGLISTE & ANALYSE ---
 with t1:
     if players:
         st.markdown('<div class="legend-box">🟢 Sieg | 🔴 Niederlage | ⚪ Offen | 🔥 Serie (3 Siege)</div>', unsafe_allow_html=True)
-        df = pd.DataFrame(players).sort_values("elo_score", ascending=False)
+        df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
         
+        # Leaderboard Tabelle
         html = '<table style="width:100%; color:#00d4ff; border-collapse: collapse;">'
         html += '<tr style="border-bottom:2px solid #00d4ff; text-align:left;"><th>Rang</th><th>Spieler</th><th>Elo</th><th>Matches</th><th>Trend</th></tr>'
-        for i, r in enumerate(df.itertuples(), 1):
+        for i, r in enumerate(df_players.itertuples(), 1):
             icon = "🥇" if i==1 else "🥈" if i==2 else "🥉" if i==3 else f"{i}."
-            streak = get_win_streak(r.username, m_df)
-            trend = get_trend(r.username, m_df)
+            # Wir brauchen für Trend/Streak die Matches absteigend (neueste zuerst)
+            m_df_desc = m_df.iloc[::-1]
+            streak = get_win_streak(r.username, m_df_desc)
+            trend = get_trend(r.username, m_df_desc)
             style = "color:white; font-weight:bold;" if i<=3 else ""
             html += f'<tr style="border-bottom:1px solid #1a1c23;{style}"><td>{icon}</td><td>{r.username}{streak}</td><td>{r.elo_score}</td><td>{r.games_played}</td><td style="letter-spacing:2px;">{trend}</td></tr>'
         st.markdown(html + '</table>', unsafe_allow_html=True)
+
+        # --- ELO VERLAUFS-CHART ---
+        st.divider()
+        st.subheader("📈 Elo-Verlauf")
+        selected_player = st.selectbox("Spieler für Analyse wählen", [p['username'] for p in players])
+        
+        if selected_player:
+            # Elo-Historie rekonstruieren
+            history = [1200]
+            current_elo = 1200
+            player_matches = m_df[(m_df['winner_name'] == selected_player) | (m_df['loser_name'] == selected_player)]
+            
+            for _, row in player_matches.iterrows():
+                if row['winner_name'] == selected_player:
+                    current_elo += row['elo_diff']
+                else:
+                    current_elo -= row['elo_diff']
+                history.append(current_elo)
+            
+            chart_data = pd.DataFrame(history, columns=["Elo"])
+            st.line_chart(chart_data, height=250)
+
     else: st.info("Keine Spieler gefunden.")
 
 # --- TAB 2: MATCH MELDEN ---
 with t2:
     if not st.session_state.user: st.warning("Bitte einloggen.")
     else:
-        if "booking_success" not in st.session_state:
-            st.session_state.booking_success = False
-
+        if "booking_success" not in st.session_state: st.session_state.booking_success = False
         url = st.text_input("AutoDarts Match Link")
         if url:
             m_id_search = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_search:
                 mid = m_id_search.group(1)
+                # Matches neu laden für den Check
                 match_exists = any(m['id'] == mid for m in matches)
                 
                 if not match_exists and not st.session_state.booking_success:
@@ -134,14 +158,14 @@ with t2:
                     if st.button("Nächstes Match eintragen"):
                         st.session_state.booking_success = False
                         st.rerun()
-                else:
-                    st.info(f"ℹ️ Dieses Match (ID: {mid}) wurde bereits gewertet.")
+                else: st.info(f"ℹ️ Dieses Match (ID: {mid}) wurde bereits gewertet.")
 
 # --- TAB 3: HISTORIE ---
 with t3:
     st.write("### 📅 Letzte Matches")
     if matches:
-        for m in matches[:15]:
+        # Hier zeigen wir die neuesten zuerst an
+        for m in matches[::-1][:15]:
             diff = m.get('elo_diff', 0)
             c1, c2 = st.columns([4, 1])
             c1.markdown(f"**{m['winner_name']}** bezwingt {m['loser_name']} <span class='badge'>+{diff} Elo</span>", unsafe_allow_html=True)
@@ -154,6 +178,5 @@ with t4:
         with st.form("reg"):
             re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Spielername")
             if st.form_submit_button("Registrieren"):
-                # Metadata für den SQL-Trigger mitschicken
                 res = conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
                 st.success("Erfolg! Logge dich jetzt ein.")
