@@ -51,19 +51,21 @@ with tab1:
 with tab3:
     st.write("### Registrierung")
     with st.form("reg_form", clear_on_submit=True):
-        new_user = st.text_input("Dein Wunsch-Name (für die Rangliste)")
-        new_auto = st.text_input("Dein exakter AutoDarts Name")
+        new_user = st.text_input("Dein Spielername")
+        new_auto = st.text_input("Dein AutoDarts Name")
         submit = st.form_submit_button("Jetzt registrieren")
         
         if submit:
             if new_user and new_auto:
-                try:
-                    conn.table("profiles").insert([
-                        {"username": new_user, "autodarts_name": new_auto, "elo_score": 1200}
-                    ]).execute()
-                    st.success(f"Willkommen {new_user}! Bitte lade die Seite neu, um dich in der Liste zu sehen.")
-                    st.balloons()
-                except Exception as e:
-                    st.error(f"Fehler: Eventuell ist der Name schon vergeben.")
+                # Debug-Info: Wir zeigen an, was wir senden
+                # st.write(f"Sende: {new_user}, {new_auto}") 
+                
+                result = conn.table("profiles").insert([
+                    {"username": new_user, "autodarts_name": new_auto, "elo_score": 1200}
+                ]).execute()
+                
+                # Wenn wir hier ankommen, war es erfolgreich
+                st.success(f"Erfolg! {new_user} wurde registriert.")
+                st.balloons()
             else:
                 st.warning("Bitte fülle beide Felder aus.")
