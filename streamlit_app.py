@@ -121,6 +121,17 @@ with tab4:
     st.write("### Registrierung")
     with st.form("reg"):
         u = st.text_input("Name")
-        if st.form_submit_button("Speichern") and u:
-            conn.table("profiles").insert({"username": u, "elo_score": 1200, "games_played": 0}).execute()
-            st.rerun()
+        submit = st.form_submit_button("Speichern")
+        if submit and u:
+            try:
+                # Wir geben alle Felder explizit mit
+                conn.table("profiles").insert({
+                    "username": u, 
+                    "elo_score": 1200, 
+                    "games_played": 0,
+                    "autodarts_name": ""
+                }).execute()
+                st.success(f"Willkommen {u}!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Fehler bei der Datenbank: {e}")
