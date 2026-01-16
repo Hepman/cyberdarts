@@ -80,9 +80,12 @@ with st.sidebar:
     st.markdown("---")
     with st.expander("⚖️ Rechtliches"):
         st.markdown("**Impressum**")
-        st.caption("Name: [Dein Name]\n\nAdresse: [Deine Adresse]\n\nE-Mail: [Deine Mail]")
+        st.caption("Name: Sascha Heptner\n\nAdresse: Römerstr. 1\n\nOrt: 79725 Laufenburg\n\nE-Mail: sascha@cyberdarts.de")
         st.divider()
-        st.caption("Daten werden in Supabase gespeichert. Keine Weitergabe an Dritte.")
+        st.markdown("**Datenschutz**")
+        st.caption("Daten (E-Mail, Elo) werden nur zur Spielverwaltung in Supabase gespeichert. Keine Weitergabe an Dritte.")
+        st.divider()
+        st.caption("CyberDarts steht in keiner offiziellen Verbindung zu AutoDarts.")
 
 # --- 5. DATEN LADEN ---
 players = conn.table("profiles").select("*").execute().data or []
@@ -98,13 +101,14 @@ with t1:
         df = pd.DataFrame(players).sort_values("elo_score", ascending=False)
         
         html = '<table style="width:100%; color:#00d4ff;">'
-        html += '<tr style="border-bottom:2px solid #00d4ff;"><th>Rang</th><th>Spieler</th><th>Elo</th><th>Matches</th><th>Trend</th></tr>'
+        html += '<tr style="border-bottom:2px solid #00d4ff; text-align: left;"><th>Rang</th><th>Spieler</th><th>Elo</th><th>Matches</th><th>Trend</th></tr>'
         
         for i, row in enumerate(df.itertuples(), 1):
             icon = "🥇" if i==1 else "🥈" if i==2 else "🥉" if i==3 else f"{i}."
             trend = get_trend_icons(row.username, m_df)
             style = "color:white; font-weight:bold;" if i<=3 else ""
-            html += f'<tr style="border-bottom:1px solid #1a1c23;{style}"><td>{icon}</td><td>{row.username}</td><td>{row.elo_score}</td><td>{row.games_played}</td><td style="letter-spacing:2px;">{trend}</td></tr>'
+            html += f'<tr style="border-bottom:1px solid #1a1c23;{style}">'
+            html += f'<td>{icon}</td><td>{row.username}</td><td>{row.elo_score}</td><td>{row.games_played}</td><td style="letter-spacing:2px;">{trend}</td></tr>'
         
         html += '</table>'
         st.markdown(html, unsafe_allow_html=True)
@@ -146,4 +150,4 @@ with t4:
             if st.form_submit_button("Registrieren"):
                 res = conn.client.auth.sign_up({"email": e, "password": p})
                 conn.table("profiles").insert({"id": res.user.id, "username": u, "elo_score": 1200, "games_played": 0}).execute()
-                st.success("Erfolgreich! Bitte einloggen.")
+                st.success("Erfolgreich! Bitte jetzt einloggen.")
