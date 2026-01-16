@@ -74,7 +74,8 @@ with st.sidebar:
     with st.expander("⚖️ Rechtliches & Datenschutz"):
         st.markdown("**Impressum**")
         st.caption("""
-        **Betreiber:** Sascha Heptner  
+        **Betreiber:**
+        Sascha Heptner  
         Römerstr. 1  
         79725 Laufenburg  
         **Kontakt:** sascha@cyberdarts.de
