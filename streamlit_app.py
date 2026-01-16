@@ -71,38 +71,55 @@ with tab2:
         if not m_id_input:
             st.warning("Bitte gib eine Match-ID ein.")
         else:
+            # 1. Check ob bereits gewertet
             already_done = conn.table("processed_matches").select("match_id").eq("match_id", m_id_input).execute()
             if already_done.data:
                 st.warning("⚠️ Dieses Match wurde bereits gewertet.")
             else:
                 api_key = st.secrets["autodarts"]["api_key"]
-                headers = {"Authorization": f"Bearer {api_key}"}
-                with st.spinner("Hole Daten von AutoDarts..."):
-                    res = requests.get(f"https://api.autodarts.io/ms/matches/{m_id_input}", headers=headers)
+                # Wir probieren verschiedene Header-Formate
+                headers = {"Authorization": f"Bearer {api_key}", "x-api-key": api_key}
+                
+                with st.spinner("Suche Match auf AutoDarts Servern..."):
+                    # PFAD A: Der Standard-Pfad
+                    url_a = f"https://api.autodarts.io/ms/matches/{m_id_input}"
+                    # PFAD B: Der alternative Cloud-Pfad
+                    url_b = f"https://api.autodarts.io/gs/matches/{m_id_input}"
+                    
+                    res = requests.get(url_a, headers=headers)
+                    if res.status_code != 200:
+                        res = requests.get(url_b, headers=headers)
+                    
                     if res.status_code == 200:
                         m_data = res.json()
+                        # Hier extrahieren wir die Spieler (AutoDarts liefert oft eine Liste 'players')
                         p_list = m_data.get("players", [])
                         winner_name = m_data.get("winner")
+                        
                         if len(p_list) >= 2:
+                            # Wir nehmen die Namen direkt aus den Player-Objekten
                             p1_aname = p_list[0].get("name")
                             p2_aname = p_list[1].get("name")
+                            
                             db_p1 = next((p for p in players if p['autodarts_name'] == p1_aname), None)
                             db_p2 = next((p for p in players if p['autodarts_name'] == p2_aname), None)
+                            
                             if db_p1 and db_p2:
                                 win_a = (winner_name == p1_aname)
                                 n1, n2 = calculate_elo(db_p1['elo_score'], db_p2['elo_score'], win_a)
+                                
                                 conn.table("profiles").update({"elo_score": n1, "games_played": db_p1['games_played']+1}).eq("id", db_p1['id']).execute()
                                 conn.table("profiles").update({"elo_score": n2, "games_played": db_p2['games_played']+1}).eq("id", db_p2['id']).execute()
                                 conn.table("processed_matches").insert({"match_id": m_id_input}).execute()
-                                st.success(f"✅ Match gewertet!")
+                                
+                                st.success(f"✅ Match gewertet! {db_p1['username']} vs {db_p2['username']}")
                                 st.balloons()
                             else:
-                                st.error("Spieler nicht bei CyberDarts registriert!")
+                                st.error(f"Spieler nicht gefunden! Im Match: '{p1_aname}' & '{p2_aname}'. Sind diese Namen EXAKT so in CyberDarts registriert?")
                         else:
-                            st.error("Match-Daten unvollständig.")
+                            st.error("Das Match scheint noch zu laufen oder ist ungültig.")
                     else:
-                        st.error(f"Fehler: {res.status_code}")
-
+                        st.error(f"Fehler {res.status_code}: AutoDarts findet dieses Match nicht unter der ID.")
 # --- TAB 3: PROFIL & REGISTRIERUNG ---
 with tab3:
     st.write("### Neuer Spieler")
