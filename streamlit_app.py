@@ -58,6 +58,8 @@ def get_win_streak(username, match_df):
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.title("🎯 CyberDarts")
+    
+    # Prüfen, ob bereits ein User in der Session ist
     if st.session_state.user:
         st.write(f"Login: **{st.session_state.user.email}**")
         if st.button("Abmelden"):
@@ -65,18 +67,26 @@ with st.sidebar:
             st.session_state.user = None
             st.rerun()
     else:
+        # Nur wenn kein User da ist, das Login-Formular zeigen
         with st.form("login"):
-            le, lp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
-            if st.form_submit_button("Einloggen"):
+            le = st.text_input("E-Mail")
+            lp = st.text_input("Passwort", type="password")
+            login_submitted = st.form_submit_button("Einloggen")
+            
+            if login_submitted:
                 try:
                     res = conn.client.auth.sign_in_with_password({"email": le, "password": lp})
-                    st.session_state.user = res.user
-                    st.rerun()
-                except: st.error("Login falsch.")
+                    # Wenn erfolgreich, User setzen und sofort RERUN
+                    if res.user:
+                        st.session_state.user = res.user
+                        st.rerun()
+                except Exception as e:
+                    # Fehlermeldung nur zeigen, wenn der Login-Versuch wirklich gescheitert ist
+                    st.error("Login fehlgeschlagen. Bitte Daten prüfen.")
+
     st.markdown("---")
     with st.expander("⚖️ Impressum"):
         st.caption("Sascha Heptner\nRömerstr. 1, 79725 Laufenburg\nsascha@cyberdarts.de")
-
 # --- 5. DATEN LADEN ---
 players = conn.table("profiles").select("*").execute().data or []
 matches = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
