@@ -1,6 +1,7 @@
 import streamlit as st
 from st_supabase_connection import SupabaseConnection
 import pandas as pd
+import requests  # <--- Diese Zeile hat gefehlt!
 
 # --- KONFIGURATION ---
 st.set_page_config(page_title="CyberDarts", layout="wide", page_icon="🎯")
