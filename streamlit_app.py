@@ -36,8 +36,8 @@ if conn:
         
         matches_res = conn.table("matches").select("*").order("created_at", desc=True).limit(5).execute()
         recent_matches = matches_res.data or []
-    except Exception as e:
-        st.warning("Hinweis: Einige Daten konnten nicht geladen werden (evtl. Tabelle noch leer).")
+    except Exception:
+        pass
 
 # --- HAUPTSEITE ---
 st.title("🎯 CyberDarts")
@@ -45,7 +45,6 @@ tab1, tab2, tab3 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "👤 Regis
 
 with tab1:
     col1, col2 = st.columns([2, 1])
-    
     with col1:
         st.write("### Top Spieler")
         if players:
@@ -54,7 +53,6 @@ with tab1:
             st.table(df.reset_index(drop=True))
         else:
             st.info("Noch keine Spieler registriert.")
-
     with col2:
         st.write("### Letzte Spiele")
         if recent_matches:
@@ -62,11 +60,10 @@ with tab1:
                 st.markdown(f"**{m['winner_name']}** vs **{m['loser_name']}** \n`+{m['elo_diff']} Elo`")
                 st.divider()
         else:
-            st.write("Noch keine Spiele gewertet.")
+            st.write("Keine Spiele gewertet.")
 
 with tab2:
     st.write("### Spielergebnis eintragen")
-    
     if 'last_result' in st.session_state:
         st.success(st.session_state.last_result)
         if st.button("Meldung schließen"):
@@ -74,21 +71,35 @@ with tab2:
             st.rerun()
 
     if len(players) >= 2:
-        player_names = sorted([p['username'] for p in players])
-        
+        p_names = sorted([p['username'] for p in players])
         with st.form("match_form", clear_on_submit=True):
-            winner_name = st.selectbox("Wer hat gewonnen?", player_names)
-            loser_name = st.selectbox("Wer hat verloren?", [n for n in player_names if n != winner_name])
-            submit_match = st.form_submit_button("Ergebnis speichern")
-            
-            if submit_match:
-                p1 = next(p for p in players if p['username'] == winner_name)
-                p2 = next(p for p in players if p['username'] == loser_name)
+            win_n = st.selectbox("Wer hat gewonnen?", p_names)
+            los_n = st.selectbox("Wer hat verloren?", [n for n in p_names if n != win_n])
+            if st.form_submit_button("Ergebnis speichern"):
+                p1 = next(p for p in players if p['username'] == win_n)
+                p2 = next(p for p in players if p['username'] == los_n)
                 
                 old_e1 = p1['elo_score']
                 new_e1, new_e2 = calculate_elo(old_e1, p2['elo_score'], True)
                 diff = new_e1 - old_e1
                 
-                # In DB speichern
+                # In DB speichern (Zeilen gekürzt gegen Kopierfehler)
                 conn.table("profiles").update({"elo_score": new_e1, "games_played": p1['games_played']+1}).eq("id", p1['id']).execute()
-                conn.table("profiles").update({"elo_score": new_e2, "games_played": p2['games_played']+1}).eq("id
+                conn.table("profiles").update({"elo_score": new_e2, "games_played": p2['games_played']+1}).eq("id", p2['id']).execute()
+                
+                # Match in Historie
+                conn.table("matches").insert({"winner_name": win_n, "loser_name": los_n, "elo_diff": diff}).execute()
+                
+                st.session_state.last_result = f"🎯 Sieg für {win_n}! (+{diff} Punkte)"
+                st.rerun()
+    else:
+        st.warning("Registriere erst mindestens 2 Spieler.")
+
+with tab3:
+    st.write("### Neuer Spieler")
+    with st.form("reg"):
+        u = st.text_input("Spielername")
+        if st.form_submit_button("Speichern") and u:
+            conn.table("profiles").insert({"username": u, "elo_score": 1200, "games_played": 0}).execute()
+            st.success(f"Willkommen {u}!")
+            st.rerun()
