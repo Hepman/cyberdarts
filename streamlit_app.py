@@ -124,8 +124,8 @@ with t1:
 
     with col_rules:
         st.markdown('<div class="rule-box"><h3>📜 Turnierregeln</h3>'
-                    '<b>Modus:</b> 501 Single Out / Double Out<br>'
-                    '<b>Distanz:</b> Best of 5 Legs (Saisonabhängig)<br>'
+                    '<b>Modus:</b> 501 Single In / Double Out<br>'
+                    '<b>Distanz:</b> Best of 3 Legs (Saisonabhängig)<br>'
                     '<b>Meldung:</b> Nur gültige AutoDarts-Links.<br><br>'
                     '<i>Fairplay wird vorausgesetzt. Bei Unstimmigkeiten entscheidet die Turnierleitung.</i></div>', unsafe_allow_html=True)
         
