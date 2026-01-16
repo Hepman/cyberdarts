@@ -63,9 +63,12 @@ with tab2:
         check_res = conn.table("matches").select("id").eq("id", m_id).execute()
         
         if check_res.data and len(check_res.data) > 0:
-            st.warning(f"⚠️ Das Match mit der ID {m_id} ist bereits in der Datenbank!")
-            st.info("Schau in der Rangliste nach, die Punkte sollten bereits dort sein.")
+            # Holen wir uns die Namen aus dem schon existierenden Match
+            m_info = check_res.data[0]
+            st.success(f"✅ Dieses Match wurde bereits am {m_info.get('created_at', 'unbekannt')} gewertet.")
+            st.info(f"Ergebnis in der DB: {m_info.get('winner_name')} hat gegen {m_info.get('loser_name')} gewonnen.")
         elif len(players) >= 2:
+            # ... hier geht der normale Formular-Code weiter ...
             st.success(f"Match {m_id} bereit zum Import.")
             names = sorted([p['username'] for p in players])
             
