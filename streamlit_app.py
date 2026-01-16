@@ -180,4 +180,23 @@ with tabs[1]:
                         st.success("Erfolg!")
                         st.rerun()
 
-# --- TAB 3: HISTOR
+# --- TAB 3: HISTORIE ---
+with tabs[2]:
+    if recent_matches:
+        for m in recent_matches[:15]:
+            c1, c2 = st.columns([4, 1])
+            c1.write(f"**{m['winner_name']}** vs {m['loser_name']} (+{m.get('elo_diff', 0)} Elo)")
+            if m.get('url'): c2.link_button("Report", m['url'])
+            st.divider()
+
+# --- TAB 4: REGISTRIERUNG ---
+with tabs[3]:
+    if not st.session_state.user:
+        with st.form("reg"):
+            r_email = st.text_input("E-Mail")
+            r_pass = st.text_input("Passwort (min. 6)", type="password")
+            r_user = st.text_input("Username")
+            if st.form_submit_button("Registrieren"):
+                res = conn.client.auth.sign_up({"email": r_email, "password": r_pass})
+                conn.table("profiles").insert({"id": res.user.id, "username": r_user, "elo_score": 1200, "games_played": 0}).execute()
+                st.success("Erfolgreich! Bitte einloggen.")
