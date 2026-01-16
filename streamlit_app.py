@@ -125,4 +125,36 @@ with tabs[1]:
                                 "id": m_id, 
                                 "winner_name": w_sel, 
                                 "loser_name": l_sel, 
-                                "elo_diff": diff,
+                                "elo_diff": diff, 
+                                "url": f"https://play.autodarts.io/history/matches/{m_id}"
+                            }).execute()
+                            st.success("Spiel gewertet!")
+                            st.rerun()
+
+# --- TAB 3: HISTORIE (Mit klickbaren Links) ---
+with tabs[2]:
+    st.write("### 📅 Letzte Spiele")
+    if recent_matches:
+        for m in recent_matches[:15]:
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.write(f"**{m['winner_name']}** gewinnt gegen {m['loser_name']} (+{m.get('elo_diff', 0)})")
+            with c2:
+                if m.get('url'):
+                    st.link_button("🔗 Report", m['url'])
+            st.divider()
+    else: st.info("Keine Spiele gefunden.")
+
+# --- TAB 4: REGISTRIERUNG ---
+with tabs[3]:
+    if not st.session_state.user:
+        with st.form("reg"):
+            r_email = st.text_input("E-Mail")
+            r_pass = st.text_input("Passwort (min. 6 Zeichen)", type="password")
+            r_user = st.text_input("Spielername")
+            if st.form_submit_button("Account erstellen"):
+                try:
+                    res = conn.client.auth.sign_up({"email": r_email, "password": r_pass})
+                    conn.table("profiles").insert({"id": res.user.id, "username": r_user, "elo_score": 1200, "games_played": 0}).execute()
+                    st.success("Registriert! Jetzt einloggen.")
+                except Exception as e: st.error(f"Fehler: {e}")
