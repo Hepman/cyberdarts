@@ -81,30 +81,30 @@ with st.sidebar:
             st.session_state.user = None
             st.rerun()
             
-        # --- ADMIN PRÜFUNG ---
-        is_admin = u_email == "sascha@cyberdarts.de"
+        # --- ADMIN LISTE ---
+        ADMIN_EMAILS = ["sascha.heptner@icloud.com", "sascha@cyberdarts.de"]
         
-        if is_admin:
+        if u_email in ADMIN_EMAILS:
             st.markdown("---")
             st.success("Admin-Status: Aktiv ✅")
             with st.expander("🛠️ ADMIN KONSOLE", expanded=True):
                 st.subheader("Saison Reset")
-                st.warning("Löscht alle Matches & setzt Elo auf 1200.")
-                confirm_reset = st.checkbox("Reset bestätigen")
-                if st.button("JETZT ZURÜCKSETZEN"):
+                st.warning("Löscht alle Matches & setzt alle Spieler auf 1200.")
+                confirm_reset = st.checkbox("Reset unwiderruflich bestätigen")
+                if st.button("JETZT SAISON NEUSTARTEN"):
                     if confirm_reset:
                         try:
-                            # Wir nutzen .neq("id", "none") um alle zu treffen
-                            conn.table("profiles").update({"elo_score": 1200, "games_played": 0}).neq("id", "000-000").execute()
-                            conn.table("matches").delete().neq("id", "000-000").execute()
+                            # Reset der Profile
+                            conn.table("profiles").update({"elo_score": 1200, "games_played": 0}).neq("username", "___").execute()
+                            # Löschen der Matches
+                            conn.table("matches").delete().neq("winner_name", "___").execute()
                             st.success("Saison erfolgreich zurückgesetzt!")
                             st.rerun()
                         except Exception as ex:
-                            st.error(f"Datenbankfehler: {ex}")
+                            st.error(f"Fehler: {ex}")
                     else:
-                        st.error("Bitte Häkchen zur Bestätigung setzen!")
+                        st.error("Bitte Bestätigungs-Häkchen setzen!")
         else:
-            # Nur für dich zur Diagnose, falls der Button nicht kommt:
             st.info("Standard-User Profil")
 
     else:
@@ -113,7 +113,7 @@ with st.sidebar:
             lp = st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
                 try:
-                    res = conn.client.auth.sign_in_with_password({"email": le.strip(), "password": lp})
+                    res = conn.client.auth.sign_in_with_password({"email": le.strip().lower(), "password": lp})
                     if res.user:
                         st.session_state.user = res.user
                         st.rerun()
@@ -214,5 +214,5 @@ with t4:
             if st.form_submit_button("Registrieren"):
                 try:
                     res = conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
-                    st.success("Registriert! Bitte einloggen.")
+                    st.success("Erfolg! Bitte logge dich jetzt ein.")
                 except Exception as e: st.error(f"Fehler: {str(e)}")
