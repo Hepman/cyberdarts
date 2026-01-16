@@ -1,8 +1,9 @@
 import streamlit as st
 from st_supabase_connection import SupabaseConnection
+import requests
 import pandas as pd
 
-# --- KONFIGURATION ---
+# --- KONFIGURATION & DESIGN ---
 st.set_page_config(page_title="CyberDarts", layout="wide")
 st.markdown("""
     <style>
@@ -12,29 +13,18 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- STABILER VERBINDUNGSAUFBAU ---
+# --- VERBINDUNG ZU SUPABASE ---
 @st.cache_resource
-def get_supabase_conn():
-    try:
-        # Wir nutzen die Secrets direkt als Fallback
-        return st.connection(
-            "supabase", 
-            type=SupabaseConnection, 
-            url=st.secrets["connections"]["supabase"]["url"], 
-            key=st.secrets["connections"]["supabase"]["key"]
-        )
-    except:
-        return None
+def get_conn():
+    return st.connection("supabase", type=SupabaseConnection, 
+                         url=st.secrets["connections"]["supabase"]["url"], 
+                         key=st.secrets["connections"]["supabase"]["key"])
 
-conn = get_supabase_conn()
+conn = get_conn()
+if conn:
+    st.sidebar.success("✅ CyberDarts Datenbank verbunden")
 
-if conn is None:
-    st.error("❌ Verbindung zu Supabase fehlgeschlagen. Bitte prüfe die Secrets!")
-    st.stop()
-else:
-    st.sidebar.success("✅ CyberDarts Online")
-
-# --- ELO LOGIK ---
+# --- ELO BERECHNUNG ---
 def calculate_elo(rating_a, rating_b, winner_is_a, k=32):
     prob_a = 1 / (1 + 10 ** ((rating_b - rating_a) / 400))
     prob_b = 1 / (1 + 10 ** ((rating_a - rating_b) / 400))
@@ -44,49 +34,67 @@ def calculate_elo(rating_a, rating_b, winner_is_a, k=32):
 
 # --- HAUPTSEITE ---
 st.title("🎯 CyberDarts")
-tab1, tab2, tab3 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "👤 Profil"])
+tab1, tab2, tab3 = st.tabs(["🏆 Rangliste", "🔄 Auto-Sync", "👤 Profil"])
 
-# Spieler laden
-try:
-    players_res = conn.table("profiles").select("*").execute()
-    players = players_res.data
-except:
-    players = []
+# Spieler aus DB laden
+players_res = conn.table("profiles").select("*").execute()
+players = players_res.data
 
 with tab1:
+    st.write("### Top Spieler")
     if players:
         df = pd.DataFrame(players)[["username", "elo_score", "games_played"]].sort_values(by="elo_score", ascending=False)
         df.columns = ["Spieler", "Elo", "Spiele"]
         st.table(df)
     else:
-        st.info("Keine Spieler registriert.")
+        st.info("Noch keine Spieler registriert.")
 
 with tab2:
-    st.write("### Match manuell werten")
-    st.info("Da der Auto-Sync noch konfiguriert wird, kannst du hier Ergebnisse eintragen.")
-    if len(players) >= 2:
-        with st.form("manual_match"):
-            winner_name = st.selectbox("Gewinner", [p['username'] for p in players])
-            loser_name = st.selectbox("Verlierer", [p['username'] for p in players if p['username'] != winner_name])
-            if st.form_submit_button("Match speichern"):
-                p1 = next(p for p in players if p['username'] == winner_name)
-                p2 = next(p for p in players if p['username'] == loser_name)
-                
-                n1, n2 = calculate_elo(p1['elo_score'], p2['elo_score'], True)
-                
-                conn.table("profiles").update({"elo_score": n1, "games_played": p1['games_played']+1}).eq("id", p1['id']).execute()
-                conn.table("profiles").update({"elo_score": n2, "games_played": p2['games_played']+1}).eq("id", p2['id']).execute()
-                
-                st.success(f"Gewertet! {winner_name} ist jetzt bei {n1} Elo.")
-                st.balloons()
-    else:
-        st.warning("Registriere erst mindestens 2 Spieler.")
+    st.write("### AutoDarts API Sync")
+    st.write("Klicke auf den Button, um deine letzten Spiele automatisch zu werten.")
+    
+    if st.button("🚀 Synchronisieren"):
+        api_key = st.secrets["autodarts"]["api_key"]
+        headers = {"x-api-key": api_key} # AutoDarts nutzt oft diesen Header
+        
+        with st.spinner("Frage AutoDarts ab..."):
+            # Wir rufen die Matches ab
+            res = requests.get("https://api.autodarts.io/ms/matches", headers=headers)
+            
+            if res.status_code == 200:
+                matches = res.json()
+                count = 0
+                for m in matches:
+                    m_id = m.get("id")
+                    # Prüfen ob Match schon in DB
+                    exists = conn.table("processed_matches").select("match_id").eq("match_id", m_id).execute()
+                    
+                    if not exists.data:
+                        p1_name = m.get("player1_name")
+                        p2_name = m.get("player2_name")
+                        winner = m.get("winner_name")
+                        
+                        db_p1 = next((p for p in players if p['autodarts_name'] == p1_name), None)
+                        db_p2 = next((p for p in players if p['autodarts_name'] == p2_name), None)
+                        
+                        if db_p1 and db_p2:
+                            n1, n2 = calculate_elo(db_p1['elo_score'], db_p2['elo_score'], winner == p1_name)
+                            # Updates
+                            conn.table("profiles").update({"elo_score": n1, "games_played": db_p1['games_played']+1}).eq("id", db_p1['id']).execute()
+                            conn.table("profiles").update({"elo_score": n2, "games_played": db_p2['games_played']+1}).eq("id", db_p2['id']).execute()
+                            conn.table("processed_matches").insert({"match_id": m_id}).execute()
+                            st.write(f"✅ Match {p1_name} vs {p2_name} gewertet!")
+                            count += 1
+                st.success(f"Fertig! {count} neue Matches eingetragen.")
+            else:
+                st.error(f"Fehler beim Abruf: {res.status_code}. Ist der API-Key korrekt?")
 
 with tab3:
     st.write("### Registrierung")
-    with st.form("reg"):
+    with st.form("reg", clear_on_submit=True):
         u = st.text_input("Name bei CyberDarts")
         a = st.text_input("Name bei AutoDarts (Exakt!)")
-        if st.form_submit_button("Registrieren") and u and a:
-            conn.table("profiles").insert({"username": u, "autodarts_name": a}).execute()
-            st.success("Registriert! Bitte lade die Seite neu.")
+        if st.form_submit_button("Registrieren"):
+            if u and a:
+                conn.table("profiles").insert({"username": u, "autodarts_name": a}).execute()
+                st.success("Spieler angelegt!")
