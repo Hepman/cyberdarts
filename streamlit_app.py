@@ -1,17 +1,16 @@
 import streamlit as st
 from st_supabase_connection import SupabaseConnection
 import pandas as pd
-import cloudscraper
 import re
 
-# --- 1. SETUP & STYLE ---
+# --- 1. SETUP & DESIGN ---
 st.set_page_config(page_title="CyberDarts", layout="wide", page_icon="🎯")
 
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117; color: #00d4ff; }
     h1, h3 { color: #00d4ff; text-shadow: 0 0 10px #00d4ff; }
-    .stButton>button { background-color: #00d4ff; color: black; font-weight: bold; width: 100%; border-radius: 5px; }
+    .stButton>button { background-color: #00d4ff; color: black; font-weight: bold; width: 100%; }
     .stTable { background-color: #1a1c23; color: #00d4ff; }
 </style>
 """, unsafe_allow_html=True)
@@ -33,91 +32,87 @@ def calculate_elo(rating_a, rating_b, winner_is_a, k=32):
 
 # --- 3. DATEN LADEN ---
 players = []
+recent_matches = []
 if conn:
     try:
         players = conn.table("profiles").select("*").execute().data or []
+        recent_matches = conn.table("matches").select("*").order("created_at", desc=True).execute().data or []
     except: pass
 
 st.title("🎯 CyberDarts")
-tab1, tab2, tab3 = st.tabs(["🏆 Rangliste", "🛡️ Match verifizieren", "👤 Registrierung"])
+tab1, tab2, tab3, tab4 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📈 Historie", "👤 Registrierung"])
 
 # --- TAB 1: RANGLISTE ---
 with tab1:
     if players:
         df = pd.DataFrame(players)[["username", "elo_score", "games_played"]].sort_values(by="elo_score", ascending=False)
-        df.columns = ["CyberDarts Name", "Elo-Punkte", "Spiele"]
+        df.columns = ["Spieler", "Elo", "Spiele"]
         st.table(df.reset_index(drop=True))
 
-# --- TAB 2: AUTOMATISCHER IMPORT (DIE WAHRHEIT) ---
+# --- TAB 2: SICHERES MELDEN (MANUELL) ---
 with tab2:
-    st.write("### 🛡️ Match-Verifizierung via AutoDarts API")
-    st.write("Das System liest das Ergebnis direkt von AutoDarts. Keine manuelle Eingabe möglich.")
+    st.write("### 🛡️ Match manuell melden")
+    st.info("Hinweis: Jeder Link wird gespeichert und ist für alle Spieler einsehbar.")
     
-    m_url = st.text_input("AutoDarts Link hier einfügen", placeholder="https://play.autodarts.io/history/matches/...")
+    m_url = st.text_input("AutoDarts Match-Link (History oder Live)", placeholder="https://play.autodarts.io/...")
     
     if m_url:
+        # ID extrahieren & Validieren
         m_id = m_url.strip().rstrip('/').split('/')[-1].split('?')[0]
         uuid_regex = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         
-        if not re.match(uuid_regex, m_id.lower()):
-            st.error("❌ Das ist keine gültige Match-ID.")
+        if not re.match(uuid_regex, m_id.lower()) or "autodarts.io" not in m_url:
+            st.error("❌ Bitte gib einen gültigen AutoDarts-Link ein.")
         else:
             check = conn.table("matches").select("*").eq("id", m_id).execute()
             if check.data:
-                st.warning(f"🚫 Match bereits registriert: {check.data[0]['winner_name']} besiegte {check.data[0]['loser_name']}")
-            else:
-                with st.spinner("🤖 Kontaktiere AutoDarts Server..."):
-                    try:
-                        scraper = cloudscraper.create_scraper()
-                        headers = {"X-API-KEY": st.secrets["autodarts"]["api_key"]}
+                st.warning(f"🚫 Dieses Match wurde bereits gewertet.")
+            elif len(players) >= 2:
+                st.success(f"✅ Match-ID `{m_id}` verifiziert.")
+                
+                names = sorted([p['username'] for p in players])
+                col1, col2 = st.columns(2)
+                w_sel = col1.selectbox("🏆 Gewinner", names, key="win_manual")
+                l_sel = col2.selectbox("📉 Verlierer", names, key="loss_manual")
+                
+                if st.button("🚀 Match jetzt offiziell eintragen"):
+                    if w_sel != l_sel:
+                        p_w = next(p for p in players if p['username'] == w_sel)
+                        p_l = next(p for p in players if p['username'] == l_sel)
+                        nw, nl = calculate_elo(p_w['elo_score'], p_l['elo_score'], True)
                         
-                        # Wir fragen die API ab
-                        api_url = f"https://api.autodarts.io/ms/matches/{m_id}"
-                        res = scraper.get(api_url, headers=headers, timeout=10)
+                        # Datenbank-Updates
+                        conn.table("profiles").update({"elo_score": nw, "games_played": p_w['games_played']+1}).eq("id", p_w['id']).execute()
+                        conn.table("profiles").update({"elo_score": nl, "games_played": p_l['games_played']+1}).eq("id", p_l['id']).execute()
+                        
+                        conn.table("matches").insert({
+                            "id": m_id, "winner_name": w_sel, "loser_name": l_sel, 
+                            "elo_diff": nw - p_w['elo_score'], "url": m_url
+                        }).execute()
+                        
+                        st.success("Match erfolgreich gespeichert!")
+                        st.balloons()
+                        st.rerun()
+                    else:
+                        st.error("Gewinner und Verlierer müssen unterschiedlich sein.")
 
-                        if res.status_code == 200:
-                            data = res.json()
-                            w_auto_name = data.get("winner")
-                            all_names = [p.get("name") for p in data.get("players", [])]
-                            l_auto_name = next((n for n in all_names if n != w_auto_name), None)
-
-                            # Abgleich mit CyberDarts Datenbank
-                            p_winner = next((p for p in players if p['autodarts_name'] == w_auto_name), None)
-                            p_loser = next((p for p in players if p['autodarts_name'] == l_auto_name), None)
-
-                            if p_winner and p_loser:
-                                st.success(f"✅ Match bestätigt: **{p_winner['username']}** hat gewonnen!")
-                                if st.button("🚀 Elo-Punkte jetzt gutschreiben"):
-                                    nw, nl = calculate_elo(p_winner['elo_score'], p_loser['elo_score'], True)
-                                    diff = nw - p_winner['elo_score']
-                                    
-                                    # DB Updates
-                                    conn.table("profiles").update({"elo_score": nw, "games_played": p_winner['games_played']+1}).eq("id", p_winner['id']).execute()
-                                    conn.table("profiles").update({"elo_score": nl, "games_played": p_loser['games_played']+1}).eq("id", p_loser['id']).execute()
-                                    conn.table("matches").insert({"id": m_id, "winner_name": p_winner['username'], "loser_name": p_loser['username'], "elo_diff": diff, "winner_elo_after": nw, "loser_elo_after": nl}).execute()
-                                    
-                                    st.success("Ergebnis wurde offiziell verbucht!")
-                                    st.balloons()
-                                    st.rerun()
-                            else:
-                                st.error(f"❌ Spieler-Zuordnung fehlgeschlagen.")
-                                st.write(f"AutoDarts sagt: `{w_auto_name}` besiegt `{l_auto_name}`.")
-                                st.info("Haben beide Spieler ihre exakten AutoDarts-Namen im Profil hinterlegt?")
-                        else:
-                            st.error(f"AutoDarts API blockiert (Status {res.status_code}).")
-                            st.info("Eventuell ist das Match 'Privat'. Bitte stelle das Match auf 'Öffentlich'.")
-                    except Exception as e:
-                        st.error(f"Technischer Fehler: {e}")
-
-# --- TAB 3: REGISTRIERUNG ---
+# --- TAB 3: HISTORIE (ZUR KONTROLLE) ---
 with tab3:
-    st.write("### Neuer Spieler")
+    st.write("### Letzte 10 Matches")
+    if recent_matches:
+        for m in recent_matches[:10]:
+            st.write(f"📅 {m['created_at'][:10]} | **{m['winner_name']}** besiegte **{m['loser_name']}**")
+            st.caption(f"Beweis-Link: {m.get('url', 'Kein Link verfügbar')}")
+            st.divider()
+
+# --- TAB 4: REGISTRIERUNG ---
+with tab4:
+    st.write("### Spieler-Registrierung")
     with st.form("reg"):
-        u = st.text_input("Name bei CyberDarts")
-        a = st.text_input("Exakter Name bei AutoDarts")
-        if st.form_submit_button("Registrieren") and u and a:
+        u = st.text_input("Anzeigename")
+        if st.form_submit_button("Registrieren") and u:
             try:
-                conn.table("profiles").insert({"username": u, "autodarts_name": a.strip(), "elo_score": 1200, "games_played": 0}).execute()
-                st.success("Erfolgreich registriert!")
+                conn.table("profiles").insert({"username": u, "elo_score": 1200, "games_played": 0}).execute()
+                st.success(f"Spieler {u} angelegt!")
                 st.rerun()
             except: st.error("Name bereits vergeben.")
