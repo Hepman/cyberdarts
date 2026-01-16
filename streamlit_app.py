@@ -127,4 +127,21 @@ with tab2:
 with tab3:
     st.write("### Elo Verlauf")
     if recent_matches and players:
-        sel_p = st.selectbox("Spieler
+        sel_p = st.selectbox("Spieler wählen", [p['username'] for p in players], key="stats_p")
+        h = [{"Zeit": "Start", "Elo": 1200}]
+        for m in reversed(recent_matches):
+            if m['winner_name'] == sel_p:
+                h.append({"Zeit": m['created_at'], "Elo": m['winner_elo_after']})
+            elif m['loser_name'] == sel_p:
+                h.append({"Zeit": m['created_at'], "Elo": m['loser_elo_after']})
+        if len(h) > 1:
+            st.line_chart(pd.DataFrame(h).set_index("Zeit")["Elo"])
+
+# --- TAB 4: REGISTRIERUNG ---
+with tab4:
+    st.write("### Neuer Spieler")
+    with st.form("reg_form"):
+        u = st.text_input("Name")
+        if st.form_submit_button("Speichern") and u:
+            conn.table("profiles").insert({"username": u, "elo_score": 1200, "games_played": 0}).execute()
+            st.rerun()
