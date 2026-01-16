@@ -51,55 +51,65 @@ if conn:
 st.title("🎯 CyberDarts")
 tab1, tab2, tab3, tab4 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung"])
 
-# --- TAB 1: RANGLISTE (Startet bei Platz 1) ---
+# --- TAB 1: RANGLISTE (Mit Rang & Siegquote) ---
 with tab1:
-    st.write("### Aktuelles Leaderboard")
+    st.write("### Elo-Leaderboard")
     if players:
-        cols = ["username", "elo_score", "games_played"]
-        df = pd.DataFrame(players)[cols].sort_values(by="elo_score", ascending=False)
+        # Daten aufbereiten
+        df = pd.DataFrame(players).sort_values(by="elo_score", ascending=False)
         
-        # Index auf 1-basierte Rangfolge setzen
-        df.index = range(1, len(df) + 1)
-        df.columns = ["Spieler", "Elo", "Spiele"]
+        # Siegquote berechnen
+        # Wir zählen für jeden Spieler die Siege aus der matches Tabelle
+        match_df = pd.DataFrame(recent_matches)
         
-        st.table(df)
+        def get_win_rate(username, games_played):
+            if games_played == 0 or match_df.empty:
+                return "0%"
+            wins = len(match_df[match_df['winner_name'] == username])
+            rate = (wins / games_played) * 100
+            return f"{round(rate)}%"
+
+        df['Siegquote'] = df.apply(lambda row: get_win_rate(row['username'], row['games_played']), axis=1)
+        
+        # Spalten auswählen und umbenennen
+        df = df[["username", "elo_score", "games_played", "Siegquote"]]
+        df.columns = ["Spieler", "Elo", "Spiele", "Siegquote"]
+        
+        # Rang-Spalte hinzufügen (startet bei 1)
+        df.insert(0, "Rang", range(1, len(df) + 1))
+        
+        # Tabelle anzeigen (ohne den Standard-Index von Pandas)
+        st.table(df.set_index("Rang"))
     else:
         st.info("Noch keine Spieler registriert.")
 
 # --- TAB 2: MATCH MELDEN ---
 with tab2:
     st.write("### ⚔️ Match eintragen")
-    st.info("Kopiere den Link aus deiner AutoDarts History. Das System verhindert doppelte Wertungen.")
-    
     raw_url = st.text_input("AutoDarts Match-Link", placeholder="https://play.autodarts.io/history/matches/...")
     
     if raw_url:
-        # Extrahiere UUID
         match_id_search = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', raw_url.lower())
         
         if not match_id_search:
-            st.error("❌ Keine gültige Match-ID gefunden. Bitte einen korrekten Link nutzen.")
+            st.error("❌ Keine gültige Match-ID gefunden.")
         else:
             m_id = match_id_search.group(1)
-            # Link für die Historie korrigieren
             clean_url = f"https://play.autodarts.io/history/matches/{m_id}"
             
-            # Check Dublette
             check = conn.table("matches").select("*").eq("id", m_id).execute()
             
             if check.data:
-                st.warning(f"🚫 Match bereits gewertet: {check.data[0]['winner_name']} vs {check.data[0]['loser_name']}")
+                st.warning(f"🚫 Match bereits gewertet.")
             elif len(players) < 2:
-                st.warning("Es müssen mindestens 2 Spieler registriert sein.")
+                st.warning("Mindestens 2 Spieler benötigt.")
             else:
-                st.success(f"✅ Match-ID erkannt: `{m_id[:8]}...`")
                 p_names = sorted([p['username'] for p in players])
-                
                 c1, c2 = st.columns(2)
                 w_sel = c1.selectbox("🏆 Gewinner", p_names, key="w_sel")
                 l_sel = c2.selectbox("📉 Verlierer", p_names, key="l_sel")
                 
-                if st.button("🚀 Ergebnis jetzt buchen"):
+                if st.button("🚀 Ergebnis speichern"):
                     if w_sel != l_sel:
                         p_w = next(p for p in players if p['username'] == w_sel)
                         p_l = next(p for p in players if p['username'] == l_sel)
@@ -107,7 +117,6 @@ with tab2:
                         nw, nl = calculate_elo(p_w['elo_score'], p_l['elo_score'], True)
                         diff = nw - p_w['elo_score']
                         
-                        # Datenbank Updates
                         conn.table("profiles").update({"elo_score": nw, "games_played": p_w['games_played']+1}).eq("id", p_w['id']).execute()
                         conn.table("profiles").update({"elo_score": nl, "games_played": p_l['games_played']+1}).eq("id", p_l['id']).execute()
                         
@@ -116,25 +125,22 @@ with tab2:
                             "elo_diff": diff, "url": clean_url
                         }).execute()
                         
-                        st.success(f"Match gespeichert! {w_sel} steigt auf.")
-                        st.balloons()
+                        st.success(f"Match gespeichert! {w_sel} +{diff} Elo.")
                         st.rerun()
                     else:
                         st.error("Spieler können nicht gegen sich selbst spielen.")
 
 # --- TAB 3: HISTORIE ---
 with tab3:
-    st.write("### Letzte 15 Begegnungen")
+    st.write("### Letzte Begegnungen")
     if recent_matches:
         for m in recent_matches[:15]:
             with st.container():
                 col_info, col_link = st.columns([4, 1])
                 target = m.get('url') or f"https://play.autodarts.io/history/matches/{m['id']}"
-                col_info.write(f"📅 {m['created_at'][:10]} | **{m['winner_name']}** schlägt {m['loser_name']} (+{m.get('elo_diff', '??')})")
+                col_info.write(f"📅 {m['created_at'][:10]} | **{m['winner_name']}** vs {m['loser_name']} (+{m.get('elo_diff', '??')})")
                 col_link.link_button("🎯 Details", target)
                 st.divider()
-    else:
-        st.info("Noch keine Matches vorhanden.")
 
 # --- TAB 4: REGISTRIERUNG ---
 with tab4:
@@ -145,7 +151,7 @@ with tab4:
             if u_name:
                 try:
                     conn.table("profiles").insert({"username": u_name, "elo_score": 1200, "games_played": 0}).execute()
-                    st.success(f"Willkommen, {u_name}!")
+                    st.success(f"Spieler {u_name} angelegt!")
                     st.rerun()
                 except:
                     st.error("Name ist schon vergeben.")
