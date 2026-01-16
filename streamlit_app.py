@@ -141,33 +141,32 @@ with tab3:
 # --- TAB 4: REGISTRIERUNG ---
 # --- TAB 4: REGISTRIERUNG ---
 # --- TAB 4: REGISTRIERUNG ---
+# --- TAB 4: REGISTRIERUNG ---
 with tab4:
     st.write("### Neuer Spieler")
-    # Wir nutzen ein Formular, damit die App nicht bei jedem Tastendruck neu lädt
     with st.form("reg_form_final", clear_on_submit=True):
         u = st.text_input("Name (Username)")
         submit_button = st.form_submit_button("Speichern")
         
-        # WICHTIG: Die Datenbank-Aktion darf NUR innerhalb dieses 'if' stehen!
-        if submit_button:
-            if u and len(u.strip()) > 0:
-                u_clean = u.strip()
-                try:
-                    # Erst prüfen, ob der Name existiert
-                    check = conn.table("profiles").select("username").eq("username", u_clean).execute()
-                    
-                    if check.data and len(check.data) > 0:
-                        st.warning(f"⚠️ '{u_clean}' ist schon dabei!")
-                    else:
-                        # Jetzt erst einfügen
-                        conn.table("profiles").insert({
-                            "username": u_clean, 
-                            "elo_score": 1200, 
-                            "games_played": 0
-                        }).execute()
-                        st.success(f"✅ {u_clean} wurde hinzugefügt!")
-                        st.rerun()
-                except Exception as e:
-                    st.error("Datenbank-Fehler. Möglicherweise existiert der Name bereits.")
-            else:
-                st.warning("Bitte gib einen Namen ein.")
+        if submit_button and u:
+            u_clean = u.strip()
+            try:
+                # Prüfen
+                check = conn.table("profiles").select("username").eq("username", u_clean).execute()
+                
+                if check.data and len(check.data) > 0:
+                    st.warning(f"⚠️ '{u_clean}' existiert bereits!")
+                else:
+                    # Einfügen
+                    conn.table("profiles").insert({
+                        "username": u_clean, 
+                        "elo_score": 1200, 
+                        "games_played": 0
+                    }).execute()
+                    st.success(f"✅ {u_clean} hinzugefügt!")
+                    st.rerun()
+            except Exception as e:
+                st.error("Datenbank-Fehler beim Speichern.")
+
+# HIER DARF JETZT NICHTS MEHR KOMMEN! 
+# Keine weiteren Befehle außerhalb der Tabs.
