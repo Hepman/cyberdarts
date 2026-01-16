@@ -97,13 +97,36 @@ recent_matches = conn.table("matches").select("*").order("created_at", desc=True
 st.title("CyberDarts Leaderboard")
 tabs = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung"])
 
-# --- TAB 1: RANGLISTE (Hübsche Version) ---
+# --- TAB 1: RANGLISTE (Hübsche Version mit Trend) ---
 with tabs[0]:
     if players:
-        # Daten vorbereiten
+        # 1. Daten laden und sortieren
         df = pd.DataFrame(players).sort_values(by="elo_score", ascending=False)
+        match_df = pd.DataFrame(recent_matches)
         
-        # Rang-Icons vergeben
+        # 2. TREND-LOGIK (Letzte 10 Spiele)
+        def get_trend(username):
+            if match_df.empty:
+                return "⚪" * 10
+            
+            # Alle Spiele finden, an denen der User beteiligt war
+            user_matches = match_df[(match_df['winner_name'] == username) | (match_df['loser_name'] == username)]
+            last_10 = user_matches.head(10) # Da nach created_at desc sortiert
+            
+            trend_icons = []
+            for _, match in last_10.iterrows():
+                if match['winner_name'] == username:
+                    trend_icons.append("🟢") # Sieg
+                else:
+                    trend_icons.append("🔴") # Niederlage
+            
+            # Mit Platzhaltern auffüllen, falls < 10 Spiele
+            while len(trend_icons) < 10:
+                trend_icons.append("⚪")
+            
+            return "".join(trend_icons)
+
+        # 3. Rang-Icons vergeben
         ranks = []
         for i in range(1, len(df) + 1):
             if i == 1: ranks.append("🥇")
@@ -111,79 +134,67 @@ with tabs[0]:
             elif i == 3: ranks.append("🥉")
             else: ranks.append(f"{i}.")
         
+        # 4. Anzeige-DF bauen
         df_display = df[["username", "elo_score", "games_played"]].copy()
-        df_display.columns = ["Spieler", "Elo-Punkte", "Spiele"]
+        df_display['Trend (Last 10)'] = df_display['username'].apply(get_trend)
+        df_display.columns = ["Spieler", "Elo", "Matches", "Trend (Letzte 10)"]
         df_display.insert(0, "Rang", ranks)
 
-        # CSS für die Tabellen-Optik (Cyber-Style)
+        # 5. CSS Styling (Cyber-Style)
         st.markdown("""
         <style>
+            .trend-text { font-size: 0.8em; letter-spacing: 2px; }
             .main-table {
                 width: 100%;
                 border-collapse: collapse;
-                margin: 25px 0;
-                font-size: 0.9em;
-                font-family: sans-serif;
-                min-width: 400px;
-                border-radius: 10px 10px 0 0;
+                margin: 10px 0;
+                color: #00d4ff;
+                background-color: #0e1117;
+                border-radius: 10px;
                 overflow: hidden;
-                box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
             }
             .main-table thead tr {
                 background-color: #00d4ff;
-                color: #000000;
+                color: #000;
                 text-align: left;
                 font-weight: bold;
             }
-            .main-table th, .main-table td {
-                padding: 12px 15px;
-            }
-            .main-table tbody tr {
-                border-bottom: 1px solid #1a1c23;
-            }
-            .main-table tbody tr:nth-of-type(even) {
-                background-color: #1a1c23;
-            }
-            .main-table tbody tr:last-of-type {
-                border-bottom: 2px solid #00d4ff;
-            }
-            .top-row {
-                font-weight: bold;
-                color: #00d4ff;
-                font-size: 1.1em;
-            }
+            .main-table th, .main-table td { padding: 12px 15px; border-bottom: 1px solid #1a1c23; }
+            .main-table tbody tr:hover { background-color: rgba(0, 212, 255, 0.1); }
+            .top-player { color: #ffffff; font-weight: bold; text-shadow: 0 0 5px #00d4ff; }
         </style>
         """, unsafe_allow_html=True)
 
-        # Tabelle manuell als HTML rendern für maximale Kontrolle
+        # 6. HTML Tabelle rendern
         html_table = "<table class='main-table'><thead><tr>"
         for col in df_display.columns:
             html_table += f"<th>{col}</th>"
         html_table += "</tr></thead><tbody>"
 
-        for i, row in df_display.iterrows():
-            # Highlight für Top 3
-            special_class = "class='top-row'" if i < 3 else ""
-            html_table += f"<tr {special_class}>"
-            for val in row:
-                html_table += f"<td>{val}</td>"
+        for i, row in df_display.reset_index(drop=True).iterrows():
+            row_class = "class='top-player'" if i < 3 else ""
+            html_table += f"<tr {row_class}>"
+            html_table += f"<td>{row['Rang']}</td>"
+            html_table += f"<td>{row['Spieler']}</td>"
+            html_table += f"<td>{row['Elo']}</td>"
+            html_table += f"<td>{row['Matches']}</td>"
+            html_table += f"<td class='trend-text'>{row['Trend (Letzte 10)']}</td>"
             html_table += "</tr>"
         
         html_table += "</tbody></table>"
-        
         st.markdown(html_table, unsafe_allow_html=True)
 
-        # Statistiken unter der Tabelle
+        # 7. Stats Kacheln
         st.divider()
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Aktive Spieler", len(players))
-        col2.metric("Absolvierte Matches", len(recent_matches))
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Spieler", len(players))
+        c2.metric("Matches", len(recent_matches))
         if not df.empty:
-            col3.metric("Spitzen-Elo", df['elo_score'].max(), delta=int(df['elo_score'].max()-1200))
+            top_elo = int(df['elo_score'].max())
+            c3.metric("Top Elo", top_elo, delta=top_elo - 1200)
 
     else:
-        st.info("Noch keine Spieler registriert. Sei der Erste!")
-
+        st.info("Noch keine Daten verfügbar.")
 # --- TAB 2: MATCH MELDEN ---
 with tabs[1]:
     if not st.session_state.user:
