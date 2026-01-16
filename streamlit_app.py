@@ -120,9 +120,25 @@ with t3:
 
 with t4:
     if not st.session_state.user:
-        with st.form("reg"):
-            re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Spielername")
+        st.write("### 👤 Neuen Account erstellen")
+        with st.form("reg_form"):
+            e = st.text_input("E-Mail Adresse")
+            p = st.text_input("Passwort (min. 6 Zeichen)", type="password")
+            u = st.text_input("Dein Spielername (für das Leaderboard)")
+            
             if st.form_submit_button("Registrieren"):
-                res = conn.client.auth.sign_up({"email": re, "password": rp})
-                conn.table("profiles").insert({"id": res.user.id, "username": ru, "elo_score": 1200, "games_played": 0}).execute()
-                st.success("Registriert! Logge dich nun ein.")
+                if len(p) < 6 or not u:
+                    st.warning("Bitte alle Felder ausfüllen (Passwort min. 6 Zeichen).")
+                else:
+                    try:
+                        # Wir geben den Usernamen als 'metadata' mit, damit der SQL-Trigger ihn findet
+                        res = conn.client.auth.sign_up({
+                            "email": e, 
+                            "password": p,
+                            "options": {"data": {"username": u}}
+                        })
+                        st.success(f"Account für {u} erstellt! Du kannst dich jetzt in der Sidebar einloggen.")
+                    except Exception as err:
+                        st.error(f"Fehler bei der Registrierung: {err}")
+    else:
+        st.info("Du bist bereits als " + st.session_state.user.email + " eingeloggt.")
