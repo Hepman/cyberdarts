@@ -114,7 +114,7 @@ with t1:
         st.markdown('<div class="rule-box"><h3>📜 Kurzregeln</h3>'
                     '• 501 SI/DO | Best of 5 Legs<br>'
                     '• Bull-Out startet das Match<br>'
-                    '• Match melden mittels Autodarts-Link<br>'
+                    '• <b>Meldung:</b> Durch den Gewinner mittels Autodarts-Link<br>'
                     '• <b>KI-Referee:</b> Pflicht bei + Mitgliedschaft. Die Entscheidung des Referees ist endgültig!</div>', unsafe_allow_html=True)
 
     if st.session_state.user:
@@ -204,7 +204,8 @@ with t5:
     <div class="info-card">
         <h3>📝 Reporting</h3>
         <ul>
-            <li>Reporting ausschließlich via AutoDarts URL der Match-Zusammenfassung.</li>
+            <li><b>Verantwortung:</b> Das Ergebnis des Spiels wird durch den <b>Gewinner</b> gemeldet.</li>
+            <li><b>Medium:</b> Reporting ausschließlich via AutoDarts URL der Match-Zusammenfassung.</li>
             <li>Beispiel: <i>https://play.autodarts.io/history/matches/...</i></li>
         </ul>
     </div>
