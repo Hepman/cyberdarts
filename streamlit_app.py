@@ -69,6 +69,7 @@ else:
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("🎯 CyberDarts")
+    
     if st.session_state.user:
         u_email = str(st.session_state.user.email).strip().lower()
         st.write(f"Login: **{u_email}**")
@@ -85,6 +86,15 @@ with st.sidebar:
                     st.session_state.user = res.user
                     st.rerun()
                 except: st.error("Login fehlgeschlagen.")
+
+    # --- IMPRESSUM FEST IN DER SIDEBAR ---
+    st.markdown("---")
+    st.markdown("### ⚖️ Impressum")
+    st.caption("**Sascha Heptner**")
+    st.caption("Römerstr. 1")
+    st.caption("79725 Laufenburg")
+    st.caption("sascha@cyberdarts.de")
+    st.caption("CyberDarts © 2026")
 
 # --- 6. TABS ---
 t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung", "📖 Anleitung"])
@@ -129,3 +139,5 @@ with t5:
         </ul>
     </div>
     """, unsafe_allow_html=True)
+
+# Restliche Tabs (t2, t3, t4) bleiben wie gehabt...
