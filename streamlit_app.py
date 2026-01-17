@@ -108,47 +108,24 @@ with t1:
                     '• 501 SI/DO | Best of 5 Legs<br>'
                     '• Bull-Out startet das Match<br>'
                     '• <b>Meldung:</b> Manuelle Meldung durch den Gewinner mit Nennung des Autodarts-Links von der Matchzusammenfassung als Beweis<br>'
-                    '• <b>KI-Referee:</b> Pflicht bei + Mitgliedschaft. Entscheidung ist endgültig!</div>', unsafe_allow_html=True)
-
-with t2:
-    if not st.session_state.user: st.warning("Bitte erst einloggen.")
-    else:
-        if "booking_success" not in st.session_state: st.session_state.booking_success = False
-        url = st.text_input("AutoDarts Zusammenfassungs-URL (Beweis)")
-        if url:
-            m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
-            if m_id_match:
-                mid = m_id_match.group(1)
-                if not any(m['id'] == mid for m in matches_data) and not st.session_state.booking_success:
-                    p_map = {p['username']: p for p in players}
-                    w = st.selectbox("Gewinner", sorted(p_map.keys()))
-                    l = st.selectbox("Verlierer", sorted(p_map.keys()))
-                    if st.button("Ergebnis jetzt buchen"):
-                        if w != l:
-                            pw, pl = p_map[w], p_map[l]
-                            nw, nl, d = calculate_elo(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'])
-                            conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
-                            conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
-                            conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": d, "url": url}).execute()
-                            st.session_state.booking_success = True; st.rerun()
+                    '• <b>KI-Referee:</b> Pflicht wenn mindestens ein Spieler AD+ Mitglied ist. Die Entscheidung des referees ist endgültig !</div>', unsafe_allow_html=True)
 
 with t5:
     st.title("📖 Ausführliche Regeln & System")
     st.markdown("""
     <div class="info-card">
-        <h3>📝 Reporting & Ergebnismeldung</h3>
-        <ul>
-            <li><b>Zuständigkeit:</b> Das Ergebnis des Spiels erfolgt durch eine <b>manuelle Meldung durch den Gewinner</b>.</li>
-            <li><b>Nachweispflicht:</b> Bei der Meldung ist zwingend der <b>AutoDarts-Link von der Matchzusammenfassung als Beweis</b> zu nennen.</li>
-            <li><b>Beispiel-Link:</b> <i>https://play.autodarts.io/history/matches/[ID]</i></li>
-        </ul>
-    </div>
-    <div class="info-card">
         <h3>🎯 Spielmodus & Referee</h3>
         <ul>
             <li><b>Modus:</b> 501 Single In / Double Out, Best of 5 Legs.</li>
             <li><b>Bull-Out:</b> Der Spieler, dessen Pfeil näher am Zentrum liegt, beginnt das Match.</li>
-            <li><b>KI-Referee:</b> Pflicht bei + Mitgliedschaft eines Spielers. Die Entscheidung ist endgültig!</li>
+            <li><b>KI-Referee:</b> Pflicht wenn mindestens ein Spieler AD+ Mitglied ist. Die Entscheidung des referees ist endgültig !</li>
+        </ul>
+    </div>
+    <div class="info-card">
+        <h3>📝 Reporting & Ergebnismeldung</h3>
+        <ul>
+            <li><b>Zuständigkeit:</b> Das Ergebnis des Spiels erfolgt durch eine <b>manuelle Meldung durch den Gewinner</b>.</li>
+            <li><b>Nachweispflicht:</b> Bei der Meldung ist zwingend der <b>AutoDarts-Link von der Matchzusammenfassung als Beweis</b> zu nennen.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
