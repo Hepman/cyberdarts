@@ -200,7 +200,9 @@ with t3:
 with t4:
     if not st.session_state.user:
         with st.form("reg"):
-            re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Name")
+            re = st.text_input("E-Mail")
+            rp = st.text_input("Passwort", type="password")
+            ru = st.text_input("Dein Name bei Autodarts")
             if st.form_submit_button("Registrieren"):
                 try:
                     conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
