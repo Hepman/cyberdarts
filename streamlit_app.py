@@ -112,10 +112,10 @@ with t1:
 
     with col_rules:
         st.markdown('<div class="rule-box"><h3>📜 Kurzregeln</h3>'
-                    '• 501 SI/DO<br>'
-                    '• Best of 5 Legs<br>'
-                    '• Bull-Out<br>'
-                    '• Match melden mittels Autodarts-Link (URL der Zusammenfassung nach dem Match)</div>', unsafe_allow_html=True)
+                    '• 501 SI/DO | Best of 5 Legs<br>'
+                    '• Bull-Out startet das Match<br>'
+                    '• Match melden mittels Autodarts-Link<br>'
+                    '• <b>KI-Referee:</b> Pflicht bei + Mitgliedschaft. Die Entscheidung des Referees ist endgültig!</div>', unsafe_allow_html=True)
 
     if st.session_state.user:
         curr_p = next((p for p in players if p['id'] == st.session_state.user.id), None)
@@ -131,7 +131,6 @@ with t1:
                         curr = curr + row['elo_diff'] if row['winner_name'] == p_name else curr - row['elo_diff']
                         hist.append(curr)
                     st.line_chart(pd.DataFrame(hist, columns=["Deine Elo"]))
-                else: st.info("Noch keine Matches gespielt.")
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
@@ -154,11 +153,9 @@ with t2:
                             conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                             conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": d, "url": url}).execute()
                             st.session_state.booking_success = True; st.rerun()
-                        else: st.error("Wähle zwei verschiedene Spieler.")
                 elif st.session_state.booking_success:
                     st.success("✅ Match erfolgreich verbucht!")
                     if st.button("Nächstes Match melden"): st.session_state.booking_success = False; st.rerun()
-                else: st.info("Match bereits gewertet.")
 
 with t3:
     st.write("### 📅 Historie")
@@ -182,11 +179,12 @@ with t5:
     
     st.markdown("""
     <div class="info-card">
-        <h3>🎯 Spielmodus: 501 Single In / Double Out</h3>
+        <h3>🎯 Spielmodus & Referee</h3>
         <ul>
-            <li><b>Start:</b> Jeder Spieler startet mit 501 Punkten. Der erste Wurf muss kein spezielles Feld treffen (Single In).</li>
-            <li><b>Finish:</b> Das Leg muss mit einem Wurf in ein <b>Doppel-Feld</b> (äußerer Ring oder Bullseye) beendet werden (Double Out).</li>
-            <li><b>Distanz:</b> Gespielt wird im Modus <b>Best of 5 Legs</b>. Wer zuerst 3 Legs gewonnen hat, gewinnt das Match.</li>
+            <li><b>Modus:</b> 501 Single In / Double Out.</li>
+            <li><b>Distanz:</b> Best of 5 Legs (First to 3).</li>
+            <li><b>KI-Referee:</b> Sollte einer der beiden Spieler eine <b>+ Mitgliedschaft</b> besitzen, ist zwingend der KI-Referee zu verwenden.</li>
+            <li><b>Entscheidung:</b> Die Entscheidung des Referees ist endgültig und unanfechtbar!</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -194,24 +192,20 @@ with t5:
     st.markdown("""
     <div class="info-card">
         <h3>🪙 Wer startet? (Bull-Out)</h3>
-        <p>Vor Beginn des Matches wird ermittelt, wer das erste Leg beginnen darf:</p>
         <ul>
-            <li>Beide Spieler werfen einen Pfeil auf das Bullseye.</li>
-            <li>Der Spieler, dessen Pfeil näher am Zentrum (Bullseye) liegt, beginnt das Match.</li>
-            <li>Treffen beide das gleiche Segment (z.B. beide Single-Bull), wird der Wurf wiederholt, bis eine Entscheidung fällt.</li>
+            <li>Beide Spieler werfen auf das Bullseye.</li>
+            <li>Der Spieler, dessen Pfeil näher am Zentrum liegt, beginnt das Match.</li>
+            <li>Bei Gleichstand wird wiederholt.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
     
-    
     st.markdown("""
     <div class="info-card">
-        <h3>📝 Reporting & Verifizierung</h3>
-        <p>Ergebnisse werden ausschließlich über <b>AutoDarts Match-Links</b> akzeptiert:</p>
+        <h3>📝 Reporting</h3>
         <ul>
-            <li>Kopiere den Link aus deiner AutoDarts-Zusammenfassung nach dem Match.</li>
-            <li>Beispiel: <i>https://play.autodarts.io/history/matches/DEINE-MATCH-ID</i></li>
-            <li>Das System extrahiert die ID und stellt sicher, dass kein Spiel doppelt gewertet wird.</li>
+            <li>Reporting ausschließlich via AutoDarts URL der Match-Zusammenfassung.</li>
+            <li>Beispiel: <i>https://play.autodarts.io/history/matches/...</i></li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -219,12 +213,10 @@ with t5:
     st.markdown("""
     <div class="info-card">
         <h3>📊 Elo-Punktesystem</h3>
-        <p>Deine Platzierung berechnet sich wie folgt:</p>
         <ul>
-            <li><b>Start:</b> 1200 Punkte.</li>
-            <li><b>Berechnung:</b> Ein Sieg gegen stärkere Gegner bringt mehr Punkte als gegen schwächere.</li>
-            <li><b>Dynamik:</b> In den ersten 30 Spielen (Einstiegsphase) gewinnst/verlierst du bis zu 32 Punkte pro Match. Danach stabilisiert sich der Wert auf max. 16 Punkte.</li>
-            <li><b>Fairness:</b> Man verliert immer exakt so viele Punkte, wie der Gegner gewinnt.</li>
+            <li>Startwert: 1200 Elo.</li>
+            <li>Mindestgewinn: 5 Punkte pro Sieg.</li>
+            <li>K-Faktor 32 (bis 30 Spiele), danach K-Faktor 16.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
