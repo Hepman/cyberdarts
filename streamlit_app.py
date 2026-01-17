@@ -82,7 +82,8 @@ with st.sidebar:
             st.rerun()
     else:
         with st.form("login_form"):
-            le, lp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
+            le = st.text_input("E-Mail")
+            lp = st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
                 try:
                     res = conn.client.auth.sign_in_with_password({"email": le.strip().lower(), "password": lp})
@@ -99,7 +100,7 @@ with t1:
     col_main, col_rules = st.columns([2, 1])
     with col_main:
         if players:
-            st.markdown('<div class="legend-box">🟢 Sieg | 🔴 Niederlage | ⚪ Offen | 🔥 3 Siege in Folge</div>', unsafe_allow_html=True)
+            st.markdown('<div class="legend-box">🟢 Sieg | 🔴 Niederlage | ⚪ Offen</div>', unsafe_allow_html=True)
             df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
             html = '<table style="width:100%; color:#00d4ff; border-collapse: collapse;">'
             html += '<tr style="border-bottom:2px solid #00d4ff; text-align:left;"><th>Rang</th><th>Spieler</th><th>Elo</th><th>Trend</th></tr>'
@@ -113,8 +114,8 @@ with t1:
         st.markdown('<div class="rule-box"><h3>📜 Kurzregeln</h3>'
                     '• 501 SI/DO<br>'
                     '• Best of 5 Legs<br>'
-                    '• Bull-Out startet<br>'
-                    '• AutoDarts Link Pflicht</div>', unsafe_allow_html=True)
+                    '• Bull-Out<br>'
+                    '• Match melden mittels Autodarts-Link (URL der Zusammenfassung nach dem Match)</div>', unsafe_allow_html=True)
 
     if st.session_state.user:
         curr_p = next((p for p in players if p['id'] == st.session_state.user.id), None)
@@ -136,7 +137,7 @@ with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
     else:
         if "booking_success" not in st.session_state: st.session_state.booking_success = False
-        url = st.text_input("AutoDarts Match Link (https://play.autodarts.io/history/matches/...)")
+        url = st.text_input("AutoDarts Match Link (URL der Zusammenfassung)")
         if url:
             m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_match:
@@ -173,7 +174,7 @@ with t4:
             if st.form_submit_button("Registrieren"):
                 try:
                     conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
-                    st.success("Erfolg! Logge dich jetzt ein.")
+                    st.success("Erfolg! Bitte einloggen.")
                 except Exception as e: st.error(f"Fehler: {e}")
 
 with t5:
@@ -190,27 +191,27 @@ with t5:
     </div>
     """, unsafe_allow_html=True)
 
-    
-
     st.markdown("""
     <div class="info-card">
         <h3>🪙 Wer startet? (Bull-Out)</h3>
         <p>Vor Beginn des Matches wird ermittelt, wer das erste Leg beginnen darf:</p>
         <ul>
             <li>Beide Spieler werfen einen Pfeil auf das Bullseye.</li>
-            <li>Der Spieler, dessen Pfeil näher am Zentrum (Bullseye) liegt, darf entscheiden, ob er das Match beginnt.</li>
+            <li>Der Spieler, dessen Pfeil näher am Zentrum (Bullseye) liegt, beginnt das Match.</li>
             <li>Treffen beide das gleiche Segment (z.B. beide Single-Bull), wird der Wurf wiederholt, bis eine Entscheidung fällt.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
+    
     
     st.markdown("""
     <div class="info-card">
         <h3>📝 Reporting & Verifizierung</h3>
         <p>Ergebnisse werden ausschließlich über <b>AutoDarts Match-Links</b> akzeptiert:</p>
         <ul>
-            <li>Kopiere den Link aus deiner AutoDarts-Historie. Beispiel: <i>https://play.autodarts.io/history/matches/DEINE-ID</i></li>
-            <li>Das System extrahiert die Match-ID und stellt sicher, dass kein Spiel doppelt gewertet wird.</li>
+            <li>Kopiere den Link aus deiner AutoDarts-Zusammenfassung nach dem Match.</li>
+            <li>Beispiel: <i>https://play.autodarts.io/history/matches/DEINE-MATCH-ID</i></li>
+            <li>Das System extrahiert die ID und stellt sicher, dass kein Spiel doppelt gewertet wird.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
