@@ -23,6 +23,10 @@ st.markdown("""
         background-color: #00d4ff; color: black; padding: 2px 8px; 
         border-radius: 10px; font-weight: bold; font-size: 0.8em;
     }
+    .stat-card {
+        background-color: #1a1c23; padding: 10px; border-radius: 8px;
+        text-align: center; border: 1px solid #00d4ff;
+    }
     .info-card {
         background-color: #1a1c23; padding: 20px; border-radius: 10px;
         border-left: 5px solid #00d4ff; margin-bottom: 15px;
@@ -57,7 +61,7 @@ def get_trend(username, match_df):
     res = "".join(icons)
     return res.ljust(10, "⚪")[:10]
 
-# --- 4. DATEN LADEN ---
+# --- 4. DATEN LADEN & STRUKTUR-CHECK ---
 players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 
@@ -69,7 +73,6 @@ else:
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("🎯 CyberDarts")
-    
     if st.session_state.user:
         u_email = str(st.session_state.user.email).strip().lower()
         st.write(f"Login: **{u_email}**")
@@ -87,14 +90,13 @@ with st.sidebar:
                     st.rerun()
                 except: st.error("Login fehlgeschlagen.")
 
-    # --- IMPRESSUM FEST IN DER SIDEBAR ---
     st.markdown("---")
-    st.markdown("### ⚖️ Impressum")
-    st.caption("**Sascha Heptner**")
-    st.caption("Römerstr. 1")
-    st.caption("79725 Laufenburg")
-    st.caption("sascha@cyberdarts.de")
-    st.caption("CyberDarts © 2026")
+    with st.expander("⚖️ Impressum"):
+        st.caption("**Sascha Heptner**")
+        st.caption("Römerstr. 1")
+        st.caption("79725 Laufenburg")
+        st.caption("sascha@cyberdarts.de")
+        st.caption("CyberDarts © 2026")
 
 # --- 6. TABS ---
 t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung", "📖 Anleitung"])
@@ -120,6 +122,28 @@ with t1:
                     '• <b>Meldung:</b> Manuelle Meldung durch den Gewinner mit Nennung des Autodarts-Links von der Matchzusammenfassung als Beweis<br>'
                     '• <b>KI-Referee:</b> Pflicht wenn mindestens ein Spieler AD+ Mitglied ist. Die Entscheidung des referees ist endgültig !</div>', unsafe_allow_html=True)
 
+with t2:
+    if not st.session_state.user: st.warning("Bitte erst einloggen.")
+    else:
+        if "booking_success" not in st.session_state: st.session_state.booking_success = False
+        url = st.text_input("AutoDarts Match Link (URL der Zusammenfassung)")
+        if url:
+            m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
+            if m_id_match:
+                mid = m_id_match.group(1)
+                if not any(m['id'] == mid for m in matches_data) and not st.session_state.booking_success:
+                    p_map = {p['username']: p for p in players}
+                    w = st.selectbox("Gewinner", sorted(p_map.keys()))
+                    l = st.selectbox("Verlierer", sorted(p_map.keys()))
+                    if st.button("Ergebnis jetzt buchen"):
+                        if w != l:
+                            pw, pl = p_map[w], p_map[l]
+                            nw, nl, d = calculate_elo(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'])
+                            conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
+                            conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
+                            conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": d, "url": url}).execute()
+                            st.session_state.booking_success = True; st.rerun()
+
 with t5:
     st.title("📖 Ausführliche Regeln & System")
     st.markdown("""
@@ -139,5 +163,3 @@ with t5:
         </ul>
     </div>
     """, unsafe_allow_html=True)
-
-# Restliche Tabs (t2, t3, t4) bleiben wie gehabt...
