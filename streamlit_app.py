@@ -23,10 +23,6 @@ st.markdown("""
         background-color: #00d4ff; color: black; padding: 2px 8px; 
         border-radius: 10px; font-weight: bold; font-size: 0.8em;
     }
-    .stat-card {
-        background-color: #1a1c23; padding: 10px; border-radius: 8px;
-        text-align: center; border: 1px solid #00d4ff;
-    }
     .info-card {
         background-color: #1a1c23; padding: 20px; border-radius: 10px;
         border-left: 5px solid #00d4ff; margin-bottom: 15px;
@@ -61,7 +57,7 @@ def get_trend(username, match_df):
     res = "".join(icons)
     return res.ljust(10, "⚪")[:10]
 
-# --- 4. DATEN LADEN & STRUKTUR-CHECK ---
+# --- 4. DATEN LADEN ---
 players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 
@@ -82,16 +78,13 @@ with st.sidebar:
             st.rerun()
     else:
         with st.form("login_form"):
-            le = st.text_input("E-Mail")
-            lp = st.text_input("Passwort", type="password")
+            le, lp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
                 try:
                     res = conn.client.auth.sign_in_with_password({"email": le.strip().lower(), "password": lp})
                     st.session_state.user = res.user
                     st.rerun()
                 except: st.error("Login fehlgeschlagen.")
-    st.markdown("---")
-    st.caption("Sascha Heptner | CyberDarts 2026")
 
 # --- 6. TABS ---
 t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung", "📖 Anleitung"])
@@ -114,29 +107,14 @@ with t1:
         st.markdown('<div class="rule-box"><h3>📜 Kurzregeln</h3>'
                     '• 501 SI/DO | Best of 5 Legs<br>'
                     '• Bull-Out startet das Match<br>'
-                    '• <b>Meldung:</b> Durch den Gewinner mittels Autodarts-Link<br>'
-                    '• <b>KI-Referee:</b> Pflicht bei + Mitgliedschaft. Die Entscheidung des Referees ist endgültig!</div>', unsafe_allow_html=True)
-
-    if st.session_state.user:
-        curr_p = next((p for p in players if p['id'] == st.session_state.user.id), None)
-        if curr_p:
-            st.divider()
-            p_name = curr_p['username']
-            st.subheader(f"📈 Dein Elo-Verlauf ({p_name})")
-            if not m_df.empty:
-                p_m = m_df[(m_df['winner_name'] == p_name) | (m_df['loser_name'] == p_name)]
-                if not p_m.empty:
-                    hist, curr = [1200], 1200
-                    for _, row in p_m.iterrows():
-                        curr = curr + row['elo_diff'] if row['winner_name'] == p_name else curr - row['elo_diff']
-                        hist.append(curr)
-                    st.line_chart(pd.DataFrame(hist, columns=["Deine Elo"]))
+                    '• <b>Meldung:</b> Manuelle Meldung durch den Gewinner mit Nennung des Autodarts-Links von der Matchzusammenfassung als Beweis<br>'
+                    '• <b>KI-Referee:</b> Pflicht bei + Mitgliedschaft. Entscheidung ist endgültig!</div>', unsafe_allow_html=True)
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
     else:
         if "booking_success" not in st.session_state: st.session_state.booking_success = False
-        url = st.text_input("AutoDarts Match Link (URL der Zusammenfassung)")
+        url = st.text_input("AutoDarts Zusammenfassungs-URL (Beweis)")
         if url:
             m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_match:
@@ -153,71 +131,24 @@ with t2:
                             conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                             conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": d, "url": url}).execute()
                             st.session_state.booking_success = True; st.rerun()
-                elif st.session_state.booking_success:
-                    st.success("✅ Match erfolgreich verbucht!")
-                    if st.button("Nächstes Match melden"): st.session_state.booking_success = False; st.rerun()
-
-with t3:
-    st.write("### 📅 Historie")
-    if not m_df.empty:
-        for m in matches_data[::-1][:15]:
-            st.markdown(f"**{m['winner_name']}** vs {m['loser_name']} <span class='badge'>+{m['elo_diff']} Elo</span>", unsafe_allow_html=True)
-            st.divider()
-
-with t4:
-    if not st.session_state.user:
-        with st.form("reg"):
-            re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Name")
-            if st.form_submit_button("Registrieren"):
-                try:
-                    conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
-                    st.success("Erfolg! Bitte einloggen.")
-                except Exception as e: st.error(f"Fehler: {e}")
 
 with t5:
     st.title("📖 Ausführliche Regeln & System")
-    
     st.markdown("""
+    <div class="info-card">
+        <h3>📝 Reporting & Ergebnismeldung</h3>
+        <ul>
+            <li><b>Zuständigkeit:</b> Das Ergebnis des Spiels erfolgt durch eine <b>manuelle Meldung durch den Gewinner</b>.</li>
+            <li><b>Nachweispflicht:</b> Bei der Meldung ist zwingend der <b>AutoDarts-Link von der Matchzusammenfassung als Beweis</b> zu nennen.</li>
+            <li><b>Beispiel-Link:</b> <i>https://play.autodarts.io/history/matches/[ID]</i></li>
+        </ul>
+    </div>
     <div class="info-card">
         <h3>🎯 Spielmodus & Referee</h3>
         <ul>
-            <li><b>Modus:</b> 501 Single In / Double Out.</li>
-            <li><b>Distanz:</b> Best of 5 Legs (First to 3).</li>
-            <li><b>KI-Referee:</b> Sollte einer der beiden Spieler eine <b>+ Mitgliedschaft</b> besitzen, ist zwingend der KI-Referee zu verwenden.</li>
-            <li><b>Entscheidung:</b> Die Entscheidung des Referees ist endgültig und unanfechtbar!</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="info-card">
-        <h3>🪙 Wer startet? (Bull-Out)</h3>
-        <ul>
-            <li>Beide Spieler werfen auf das Bullseye.</li>
-            <li>Der Spieler, dessen Pfeil näher am Zentrum liegt, beginnt das Match.</li>
-            <li>Bei Gleichstand wird wiederholt.</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="info-card">
-        <h3>📝 Reporting</h3>
-        <ul>
-            <li><b>Verantwortung:</b> Das Ergebnis des Spiels wird durch den <b>Gewinner</b> gemeldet.</li>
-            <li><b>Medium:</b> Reporting ausschließlich via AutoDarts URL der Match-Zusammenfassung.</li>
-            <li>Beispiel: <i>https://play.autodarts.io/history/matches/...</i></li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="info-card">
-        <h3>📊 Elo-Punktesystem</h3>
-        <ul>
-            <li>Startwert: 1200 Elo.</li>
-            <li>Mindestgewinn: 5 Punkte pro Sieg.</li>
-            <li>K-Faktor 32 (bis 30 Spiele), danach K-Faktor 16.</li>
+            <li><b>Modus:</b> 501 Single In / Double Out, Best of 5 Legs.</li>
+            <li><b>Bull-Out:</b> Der Spieler, dessen Pfeil näher am Zentrum liegt, beginnt das Match.</li>
+            <li><b>KI-Referee:</b> Pflicht bei + Mitgliedschaft eines Spielers. Die Entscheidung ist endgültig!</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
