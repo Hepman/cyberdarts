@@ -222,20 +222,36 @@ with t4:
 
 with t5:
     st.title("📖 Anleitung & System")
+    
     st.markdown("""
     <div class="info-card">
         <h3>🎯 Spielmodus & Referee</h3>
         <ul>
-            <li><b>Modus:</b> 501 Single In / Double Out, Best of 5 Legs.</li>
+            <li><b>Modus:</b> 501 Single In / Double Out, Best of 5 Legs (First to 3).</li>
             <li><b>Bull-Out:</b> Der Spieler, dessen Pfeil näher am Zentrum liegt, beginnt das Match.</li>
             <li><b>KI-Referee:</b> Pflicht wenn mindestens ein Spieler AD+ Mitglied ist. Die Entscheidung des referees ist endgültig !</li>
         </ul>
     </div>
     <div class="info-card">
-        <h3>📝 Reporting & Ergebnismeldung</h3>
+        <h3>📝 Reporting</h3>
         <ul>
             <li><b>Zuständigkeit:</b> Das Ergebnis des Spiels erfolgt durch eine <b>manuelle Meldung durch den Gewinner</b>.</li>
-            <li><b>Nachweispflicht:</b> Bei der Meldung ist zwingend der <b>AutoDarts-Link von der Matchzusammenfassung als Beweis</b> zu nennen. Meldungen ohne gültigen link werden entfernt.</li>
+            <li><b>Nachweis:</b> Zwingend mit AutoDarts-Link der Zusammenfassung als Beweis. Meldungen ohne gültigen Link werden entfernt.</li>
         </ul>
     </div>
+    <div class="info-card">
+        <h3>📊 Elo-System</h3>
+        <ul>
+            <li>Start: 1200 Punkte. Mindestgewinn pro Sieg: 5 Punkte.</li>
+            <li>K-Faktor: 32 für die ersten 30 Spiele, danach 16.</li>
+        </ul>
+    </div>
+
+    <div style="margin-top: 50px; padding: 15px; background-color: #0e1117; border: 1px solid #333; border-radius: 8px; font-size: 0.85rem; color: #888;">
+        <b>Rechtlicher Hinweis:</b><br>
+        CyberDarts ist ein unabhängiges Community-Projekt von Sascha Heptner und steht in <b>keiner geschäftlichen oder rechtlichen Verbindung</b> zur Autodarts GmbH. 
+        Die Nutzung von AutoDarts-Links dient ausschließlich dem manuellen Nachweis privat gespielter Matches im Rahmen dieses Ranking-Systems. 
+        Alle Rechte an der Marke Autodarts und deren Diensten liegen bei der Autodarts GmbH.
+    </div>
+    """, unsafe_allow_html=True)
     """, unsafe_allow_html=True)
