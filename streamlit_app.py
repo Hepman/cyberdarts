@@ -3,21 +3,30 @@ from st_supabase_connection import SupabaseConnection
 import pandas as pd
 import re
 
-# --- 1. SETUP & STYLE (DARK MODE FORCED) ---
-st.set_page_config(page_title="CyberDarts", layout="wide", page_icon="🎯")
+# --- 1. SETUP & SEO OPTIMIERUNG ---
+st.set_page_config(
+    page_title="CyberDarts | Das Autodarts Elo-Ranking", 
+    layout="wide", 
+    page_icon="🎯"
+)
 
+# SEO Meta-Tags & Forced Dark Mode CSS
 st.markdown("""
+<head>
+    <meta name="description" content="CyberDarts - Die Ranking-Plattform für Autodarts-Spieler. Verfolge dein Elo-Rating und steige im Leaderboard auf.">
+    <meta name="keywords" content="Autodarts, Darts Ranking, Elo Score, 501 Darts, Dart Rangliste, CyberDarts, Sascha Heptner">
+    <meta name="author" content="Sascha Heptner">
+    <meta name="robots" content="index, follow">
+</head>
 <style>
-    /* Erzwingt dunklen Hintergrund für die gesamte App */
+    /* Erzwingt dunklen Hintergrund */
     .stApp { 
         background-color: #0e1117 !important; 
         color: #00d4ff !important; 
     }
     
-    /* Fix für Texte, die im Light-Mode schwarz wären */
-    p, span, label, .stMarkdown {
-        color: #00d4ff !important;
-    }
+    /* Fix für Texte */
+    p, span, label, .stMarkdown { color: #00d4ff !important; }
 
     /* Header & Titel */
     h1, h2, h3 { 
@@ -35,46 +44,37 @@ st.markdown("""
         border: none;
     }
 
-    /* Eingabefelder (Inputs) dunkel stylen */
+    /* Eingabefelder */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #1a1c23 !important;
         color: #00d4ff !important;
         border: 1px solid #00d4ff !important;
     }
 
-    /* Sidebar dunkel halten */
+    /* Sidebar */
     [data-testid="stSidebar"] {
         background-color: #0e1117 !important;
         border-right: 1px solid #333;
     }
 
-    /* Info-Boxen & Tabellen */
-    .legend-box {
+    /* Info-Boxen */
+    .legend-box, .rule-box, .info-card {
         background-color: #1a1c23; padding: 15px; border-radius: 8px; 
         border-left: 5px solid #00d4ff; margin-bottom: 20px;
     }
-    .rule-box {
-        background-color: #1a1c23; padding: 15px; border-radius: 8px;
-        border: 1px solid #333; margin-top: 10px;
-    }
-    .info-card {
-        background-color: #1a1c23; padding: 20px; border-radius: 10px;
-        border-left: 5px solid #00d4ff; margin-bottom: 15px;
-    }
+    
     .badge {
         background-color: #00d4ff; color: #0e1117; padding: 2px 8px; 
         border-radius: 10px; font-weight: bold; font-size: 0.8em;
     }
     
-    /* Tabs Styling */
-    .stTabs [data-baseweb="tab"] {
-        color: #888 !important;
-    }
-    .stTabs [aria-selected="true"] {
-        color: #00d4ff !important;
-        border-bottom-color: #00d4ff !important;
-    }
+    /* Tabs */
+    .stTabs [data-baseweb="tab"] { color: #888 !important; }
+    .stTabs [aria-selected="true"] { color: #00d4ff !important; border-bottom-color: #00d4ff !important; }
 </style>
+
+<h1 style='text-align: center;'>🎯 CyberDarts: Autodarts Ranking Community</h1>
+<p style='text-align: center; font-style: italic;'>Das unabhängige Leaderboard für ambitionierte Autodarts-Spieler.</p>
 """, unsafe_allow_html=True)
 
 # --- 2. DATENBANK-VERBINDUNG ---
@@ -135,11 +135,7 @@ with st.sidebar:
 
     st.markdown("---")
     with st.expander("⚖️ Impressum"):
-        st.caption("**Sascha Heptner**")
-        st.caption("Römerstr. 1")
-        st.caption("79725 Laufenburg")
-        st.caption("sascha@cyberdarts.de")
-        st.caption("CyberDarts © 2026")
+        st.caption("**Sascha Heptner**\nRömerstr. 1\n79725 Laufenburg\nsascha@cyberdarts.de\n\nCyberDarts © 2026")
 
 # --- 6. TABS ---
 t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung", "📖 Anleitung"])
@@ -162,8 +158,8 @@ with t1:
         st.markdown(f'''<div class="rule-box"><h3>📜 Kurzregeln</h3>
         • 501 SI/DO | Best of 5 Legs<br>
         • Bull-Out startet das Match<br>
-        • <b>Meldung:</b> Manuelle Meldung durch den Gewinner mit Nennung des Autodarts-Links von der Matchzusammenfassung als Beweis. Meldungen ohne gültigen link werden entfernt.<br>
-        • <b>KI-Referee:</b> Pflicht wenn mindestens ein Spieler AD+ Mitglied ist. Die Entscheidung des referees ist endgültig !</div>''', unsafe_allow_html=True)
+        • <b>Meldung:</b> Manuelle Meldung durch den Gewinner mit Nennung des Autodarts-Links als Beweis. Meldungen ohne gültigen Link werden entfernt.<br>
+        • <b>KI-Referee:</b> Pflicht wenn mindestens ein Spieler AD+ Mitglied ist. Entscheidung ist endgültig!</div>''', unsafe_allow_html=True)
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
@@ -200,8 +196,7 @@ with t3:
 with t4:
     if not st.session_state.user:
         with st.form("reg"):
-            re = st.text_input("E-Mail")
-            rp = st.text_input("Passwort", type="password")
+            re, rp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
             ru = st.text_input("Dein Name bei Autodarts")
             if st.form_submit_button("Registrieren"):
                 try:
@@ -227,18 +222,17 @@ with t5:
             <li><b>Nachweispflicht:</b> Bei der Meldung ist zwingend der <b>AutoDarts-Link von der Matchzusammenfassung als Beweis</b> zu nennen. Meldungen ohne gültigen Link werden entfernt.</li>
         </ul>
     </div>
-    <div class="info-card">
-        <h3>📊 Elo-System</h3>
-        <ul>
-            <li>Start: 1200 Punkte. Mindestgewinn pro Sieg: 5 Punkte.</li>
-            <li>K-Faktor: 32 für die ersten 30 Spiele, danach 16.</li>
-        </ul>
+    
+    <div style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px; opacity: 0.8; font-size: 0.9rem;">
+        <h4>Über CyberDarts</h4>
+        <p>CyberDarts ist die Community-Plattform für <b>Autodarts-Spieler</b>, die ein faires <b>Elo-Ranking</b> suchen. 
+        Wir fördern den Wettbewerb in der deutschen <b>Autodarts Community</b> durch Transparenz und Leistung.</p>
     </div>
 
     <div style="margin-top: 50px; padding: 15px; background-color: #0e1117; border: 1px solid #333; border-radius: 8px; font-size: 0.85rem; color: #888;">
         <b>Rechtlicher Hinweis:</b><br>
         CyberDarts ist ein unabhängiges Community-Projekt von <b>Sascha Heptner</b> und steht in keiner geschäftlichen oder rechtlichen Verbindung zur Autodarts GmbH. 
-        Die Nutzung von AutoDarts-Links dient ausschließlich dem manuellen Nachweis privat gespielter Matches im Rahmen dieses Ranking-Systems. 
-        Alle Rechte an der Marke Autodarts und deren Diensten liegen bei der Autodarts GmbH.
+        Die Nutzung von AutoDarts-Links dient dem manuellen Nachweis privat gespielter Matches. 
+        Alle Rechte an der Marke Autodarts liegen bei der Autodarts GmbH.
     </div>
     """, unsafe_allow_html=True)
