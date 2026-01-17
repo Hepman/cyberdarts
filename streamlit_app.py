@@ -3,29 +3,76 @@ from st_supabase_connection import SupabaseConnection
 import pandas as pd
 import re
 
-# --- 1. SETUP & STYLE ---
+# --- 1. SETUP & STYLE (DARK MODE FORCED) ---
 st.set_page_config(page_title="CyberDarts", layout="wide", page_icon="🎯")
 
 st.markdown("""
 <style>
-    .stApp { background-color: #0e1117; color: #00d4ff; }
-    h1, h3 { color: #00d4ff; text-shadow: 0 0 10px #00d4ff; }
-    .stButton>button { background-color: #00d4ff; color: black; font-weight: bold; width: 100%; border-radius: 5px; }
+    /* Erzwingt dunklen Hintergrund für die gesamte App */
+    .stApp { 
+        background-color: #0e1117 !important; 
+        color: #00d4ff !important; 
+    }
+    
+    /* Fix für Texte, die im Light-Mode schwarz wären */
+    p, span, label, .stMarkdown {
+        color: #00d4ff !important;
+    }
+
+    /* Header & Titel */
+    h1, h2, h3 { 
+        color: #00d4ff !important; 
+        text-shadow: 0 0 10px #00d4ff; 
+    }
+
+    /* Buttons */
+    .stButton>button { 
+        background-color: #00d4ff !important; 
+        color: #0e1117 !important; 
+        font-weight: bold !important; 
+        width: 100%; 
+        border-radius: 5px; 
+        border: none;
+    }
+
+    /* Eingabefelder (Inputs) dunkel stylen */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div {
+        background-color: #1a1c23 !important;
+        color: #00d4ff !important;
+        border: 1px solid #00d4ff !important;
+    }
+
+    /* Sidebar dunkel halten */
+    [data-testid="stSidebar"] {
+        background-color: #0e1117 !important;
+        border-right: 1px solid #333;
+    }
+
+    /* Info-Boxen & Tabellen */
     .legend-box {
         background-color: #1a1c23; padding: 15px; border-radius: 8px; 
-        border-left: 5px solid #00d4ff; margin-bottom: 20px; color: #00d4ff;
+        border-left: 5px solid #00d4ff; margin-bottom: 20px;
     }
     .rule-box {
         background-color: #1a1c23; padding: 15px; border-radius: 8px;
         border: 1px solid #333; margin-top: 10px;
     }
-    .badge {
-        background-color: #00d4ff; color: black; padding: 2px 8px; 
-        border-radius: 10px; font-weight: bold; font-size: 0.8em;
-    }
     .info-card {
         background-color: #1a1c23; padding: 20px; border-radius: 10px;
         border-left: 5px solid #00d4ff; margin-bottom: 15px;
+    }
+    .badge {
+        background-color: #00d4ff; color: #0e1117; padding: 2px 8px; 
+        border-radius: 10px; font-weight: bold; font-size: 0.8em;
+    }
+    
+    /* Tabs Styling */
+    .stTabs [data-baseweb="tab"] {
+        color: #888 !important;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #00d4ff !important;
+        border-bottom-color: #00d4ff !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -57,7 +104,7 @@ def get_trend(username, match_df):
     res = "".join(icons)
     return res.ljust(10, "⚪")[:10]
 
-# --- 4. DATEN LADEN & STRUKTUR-CHECK ---
+# --- 4. DATEN LADEN ---
 players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 
@@ -189,7 +236,4 @@ with t5:
     <div style="margin-top: 50px; padding: 15px; background-color: #0e1117; border: 1px solid #333; border-radius: 8px; font-size: 0.85rem; color: #888;">
         <b>Rechtlicher Hinweis:</b><br>
         CyberDarts ist ein unabhängiges Community-Projekt von <b>Sascha Heptner</b> und steht in keiner geschäftlichen oder rechtlichen Verbindung zur Autodarts GmbH. 
-        Die Nutzung von AutoDarts-Links dient ausschließlich dem manuellen Nachweis privat gespielter Matches im Rahmen dieses Ranking-Systems. 
-        Alle Rechte an der Marke Autodarts und deren Diensten liegen bei der Autodarts GmbH.
-    </div>
-    """, unsafe_allow_html=True)
+        Die Nutzung von AutoDarts-Links dient ausschließlich dem manuellen Nachweis privat gespielter Matches im Rahmen dieses Ranking-Systems.
