@@ -236,4 +236,7 @@ with t5:
     <div style="margin-top: 50px; padding: 15px; background-color: #0e1117; border: 1px solid #333; border-radius: 8px; font-size: 0.85rem; color: #888;">
         <b>Rechtlicher Hinweis:</b><br>
         CyberDarts ist ein unabhängiges Community-Projekt von <b>Sascha Heptner</b> und steht in keiner geschäftlichen oder rechtlichen Verbindung zur Autodarts GmbH. 
-        Die Nutzung von AutoDarts-Links dient ausschließlich dem manuellen Nachweis privat gespielter Matches im Rahmen dieses Ranking-Systems.
+        Die Nutzung von AutoDarts-Links dient ausschließlich dem manuellen Nachweis privat gespielter Matches im Rahmen dieses Ranking-Systems. 
+        Alle Rechte an der Marke Autodarts und deren Diensten liegen bei der Autodarts GmbH.
+    </div>
+    """, unsafe_allow_html=True)
