@@ -64,11 +64,11 @@ def get_win_streak(username, match_df):
         return " 🔥"
     return ""
 
-# --- 4. DATEN LADEN & FIX ---
+# --- 4. DATEN LADEN & STRUKTUR SICHERN ---
 players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 
-# WICHTIG: Falls leer, DataFrame mit Spalten erzwingen um KeyError zu vermeiden
+# Falls die Datenbank leer ist, DataFrame mit Spalten-Skelett erstellen (verhindert KeyError)
 if not matches_data:
     m_df = pd.DataFrame(columns=['id', 'winner_name', 'loser_name', 'elo_diff', 'url', 'created_at'])
 else:
@@ -86,7 +86,8 @@ with st.sidebar:
             st.rerun()
     else:
         with st.form("login_form"):
-            le, lp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
+            le = st.text_input("E-Mail")
+            lp = st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
                 try:
                     res = conn.client.auth.sign_in_with_password({"email": le.strip().lower(), "password": lp})
@@ -119,7 +120,8 @@ with t1:
     with col_rules:
         st.markdown('<div class="rule-box"><h3>📜 Turnierregeln</h3>'
                     '<b>Modus:</b> 501 Single In / Double Out<br>'
-                    '<b>Distanz:</b> Best of 5 Legs</div>', unsafe_allow_html=True)
+                    '<b>Distanz:</b> Best of 5 Legs<br>'
+                    '<b>Reporting:</b> Match Report via AutoDarts Link</div>', unsafe_allow_html=True)
 
     st.divider()
     if st.session_state.user:
@@ -127,7 +129,6 @@ with t1:
         if curr_p:
             p_name = curr_p['username']
             st.subheader(f"📈 Dein Elo-Verlauf ({p_name})")
-            # Nur anzeigen wenn Matches vorhanden sind
             if not m_df.empty:
                 hist, curr = [1200], 1200
                 p_m = m_df[(m_df['winner_name'] == p_name) | (m_df['loser_name'] == p_name)]
@@ -139,7 +140,7 @@ with t1:
                 with c1: st.line_chart(pd.DataFrame(hist, columns=["Deine Elo"]))
                 with c2: st.markdown(f'<div class="stat-card"><small>Matches</small><h3>{len(p_m)}</h3><small>Winrate</small><h3>{wr}%</h3></div>', unsafe_allow_html=True)
             else:
-                st.info("Noch keine Matches vorhanden.")
+                st.info("Noch keine Matches vorhanden. Deine Elo startet bei 1200.")
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
@@ -163,11 +164,13 @@ with t2:
                             conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": d, "url": url}).execute()
                             st.session_state.booking_success = True
                             st.rerun()
-                        else: st.error("Spieler müssen unterschiedlich sein.")
+                        else: st.error("Bitte wähle zwei verschiedene Spieler aus.")
                 elif st.session_state.booking_success:
-                    st.success("✅ Verbucht!"); 
-                    if st.button("Nächstes Match"): st.session_state.booking_success = False; st.rerun()
-                else: st.info("Match bereits gewertet.")
+                    st.success("✅ Match erfolgreich verbucht!")
+                    if st.button("Nächstes Match melden"): 
+                        st.session_state.booking_success = False
+                        st.rerun()
+                else: st.info("ℹ️ Dieses Match wurde bereits gewertet.")
 
 with t3:
     st.write("### 📅 Historie")
@@ -176,14 +179,14 @@ with t3:
             st.markdown(f"**{m['winner_name']}** vs {m['loser_name']} <span class='badge'>+{m['elo_diff']} Elo</span>", unsafe_allow_html=True)
             st.divider()
     else:
-        st.info("Keine Einträge.")
+        st.info("Noch keine Matches aufgezeichnet.")
 
 with t4:
     if not st.session_state.user:
         with st.form("reg"):
-            re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Name")
+            re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Anzeigename")
             if st.form_submit_button("Registrieren"):
                 try:
                     conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
-                    st.success("Erfolg! Bitte einloggen.")
+                    st.success("Erfolg! Logge dich jetzt ein.")
                 except Exception as e: st.error(f"Fehler: {e}")
