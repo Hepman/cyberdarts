@@ -27,6 +27,10 @@ st.markdown("""
         background-color: #1a1c23; padding: 10px; border-radius: 8px;
         text-align: center; border: 1px solid #00d4ff;
     }
+    .info-card {
+        background-color: #1a1c23; padding: 20px; border-radius: 10px;
+        border-left: 5px solid #00d4ff; margin-bottom: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -44,9 +48,10 @@ if "user" not in st.session_state:
 
 # --- 3. HELPER FUNKTIONEN ---
 def calculate_elo(rating_w, rating_l, games_w, games_l):
-    k_w = 32 if games_w < 30 else 16
+    # K-Faktor: 32 für die ersten 30 Spiele (schnelles Einpendeln), danach 16 (Stabilität)
+    k = 32 if games_w < 30 else 16
     prob_w = 1 / (1 + 10 ** ((rating_l - rating_w) / 400))
-    gain = max(round(k_w * (1 - prob_w)), 5)
+    gain = max(round(k * (1 - prob_w)), 5) # Mindestens 5 Punkte pro Sieg
     return int(rating_w + gain), int(rating_l - gain), int(gain)
 
 def get_trend(username, match_df):
@@ -64,11 +69,10 @@ def get_win_streak(username, match_df):
         return " 🔥"
     return ""
 
-# --- 4. DATEN LADEN & STRUKTUR SICHERN ---
+# --- 4. DATEN LADEN & FIX ---
 players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 
-# Falls die Datenbank leer ist, DataFrame mit Spalten-Skelett erstellen (verhindert KeyError)
 if not matches_data:
     m_df = pd.DataFrame(columns=['id', 'winner_name', 'loser_name', 'elo_diff', 'url', 'created_at'])
 else:
@@ -86,21 +90,19 @@ with st.sidebar:
             st.rerun()
     else:
         with st.form("login_form"):
-            le = st.text_input("E-Mail")
-            lp = st.text_input("Passwort", type="password")
+            le, lp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
                 try:
                     res = conn.client.auth.sign_in_with_password({"email": le.strip().lower(), "password": lp})
                     st.session_state.user = res.user
                     st.rerun()
-                except Exception as e: st.error(f"Fehler: {e}")
+                except: st.error("Login fehlgeschlagen.")
 
     st.markdown("---")
-    with st.expander("⚖️ Impressum"):
-        st.caption("Sascha Heptner\nRömerstr. 1, 79725 Laufenburg\nsascha@cyberdarts.de")
+    st.caption("Sascha Heptner | Laufenburg")
 
 # --- 6. TABS ---
-t1, t2, t3, t4 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung"])
+t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung", "📖 Anleitung"])
 
 with t1:
     col_main, col_rules = st.columns([2, 1])
@@ -118,10 +120,10 @@ with t1:
             st.markdown(html + '</table>', unsafe_allow_html=True)
 
     with col_rules:
-        st.markdown('<div class="rule-box"><h3>📜 Turnierregeln</h3>'
-                    '<b>Modus:</b> 501 Single In / Double Out<br>'
-                    '<b>Distanz:</b> Best of 5 Legs<br>'
-                    '<b>Reporting:</b> Match Report via AutoDarts Link</div>', unsafe_allow_html=True)
+        st.markdown('<div class="rule-box"><h3>📜 Kurzregeln</h3>'
+                    '• 501 Single In / Double Out<br>'
+                    '• Best of 5 Legs<br>'
+                    '• Link von AutoDarts nötig</div>', unsafe_allow_html=True)
 
     st.divider()
     if st.session_state.user:
@@ -139,8 +141,7 @@ with t1:
                 c1, c2 = st.columns([3, 1])
                 with c1: st.line_chart(pd.DataFrame(hist, columns=["Deine Elo"]))
                 with c2: st.markdown(f'<div class="stat-card"><small>Matches</small><h3>{len(p_m)}</h3><small>Winrate</small><h3>{wr}%</h3></div>', unsafe_allow_html=True)
-            else:
-                st.info("Noch keine Matches vorhanden. Deine Elo startet bei 1200.")
+            else: st.info("Noch keine Matches vorhanden.")
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
@@ -162,15 +163,12 @@ with t2:
                             conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
                             conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                             conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": d, "url": url}).execute()
-                            st.session_state.booking_success = True
-                            st.rerun()
-                        else: st.error("Bitte wähle zwei verschiedene Spieler aus.")
+                            st.session_state.booking_success = True; st.rerun()
+                        else: st.error("Spieler müssen unterschiedlich sein.")
                 elif st.session_state.booking_success:
-                    st.success("✅ Match erfolgreich verbucht!")
-                    if st.button("Nächstes Match melden"): 
-                        st.session_state.booking_success = False
-                        st.rerun()
-                else: st.info("ℹ️ Dieses Match wurde bereits gewertet.")
+                    st.success("✅ Verbucht!"); 
+                    if st.button("Nächstes Match"): st.session_state.booking_success = False; st.rerun()
+                else: st.info("Match bereits gewertet.")
 
 with t3:
     st.write("### 📅 Historie")
@@ -178,15 +176,45 @@ with t3:
         for m in matches_data[::-1][:15]:
             st.markdown(f"**{m['winner_name']}** vs {m['loser_name']} <span class='badge'>+{m['elo_diff']} Elo</span>", unsafe_allow_html=True)
             st.divider()
-    else:
-        st.info("Noch keine Matches aufgezeichnet.")
 
 with t4:
     if not st.session_state.user:
         with st.form("reg"):
-            re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Anzeigename")
+            re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Name")
             if st.form_submit_button("Registrieren"):
                 try:
                     conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
-                    st.success("Erfolg! Logge dich jetzt ein.")
+                    st.success("Erfolg! Bitte einloggen.")
                 except Exception as e: st.error(f"Fehler: {e}")
+
+with t5:
+    st.title("📖 Spielanleitung & System")
+    
+    st.markdown("""
+    <div class="info-card">
+        <h3>🎯 Turnierregeln</h3>
+        <p>Um die Vergleichbarkeit zu gewährleisten, gelten für alle Ranglistenspiele folgende Regeln:</p>
+        <ul>
+            <li><b>Modus:</b> 501 Punkte</li>
+            <li><b>Start/Finish:</b> Single In / Double Out</li>
+            <li><b>Siegbedingung:</b> Best of 5 Legs (Wer zuerst 3 Legs gewinnt)</li>
+            <li><b>Meldung:</b> Jedes Match muss über einen gültigen <b>AutoDarts Link</b> verifiziert werden.</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="info-card">
+        <h3>📊 Das Elo-System</h3>
+        <p>Die Rangliste basiert auf dem Elo-System. Dein Rating steigt oder fällt basierend auf deinen Ergebnissen und der Stärke deiner Gegner.</p>
+        <ul>
+            <li><b>Start-Rating:</b> Jeder neue Spieler startet mit <b>1200 Punkten</b>.</li>
+            <li><b>Starke Gegner:</b> Ein Sieg gegen einen Spieler mit mehr Punkten bringt dir einen größeren Bonus.</li>
+            <li><b>Favoriten-Sieg:</b> Gewinnst du gegen einen deutlich schwächeren Spieler, erhältst du nur wenige Punkte.</li>
+            <li><b>K-Faktor (Dynamik):</b> In deinen ersten <b>30 Spielen</b> verändert sich deine Elo schneller (K=32), damit du zügig an deinem richtigen Platz landest. Danach stabilisiert sich dein Wert (K=16).</li>
+            <li><b>Mindestgewinn:</b> Für jeden Sieg erhältst du <b>mindestens 5 Elo-Punkte</b>.</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.info("💡 Tipp: Fordere Spieler heraus, die über dir stehen, um schneller in der Rangliste aufzusteigen!")
