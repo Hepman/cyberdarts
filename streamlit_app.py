@@ -29,7 +29,7 @@ st.markdown("""
     }
     .info-card {
         background-color: #1a1c23; padding: 20px; border-radius: 10px;
-        border-left: 5px solid #00d4ff; margin-bottom: 10px;
+        border-left: 5px solid #00d4ff; margin-bottom: 15px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -48,10 +48,9 @@ if "user" not in st.session_state:
 
 # --- 3. HELPER FUNKTIONEN ---
 def calculate_elo(rating_w, rating_l, games_w, games_l):
-    # K-Faktor: 32 für die ersten 30 Spiele (schnelles Einpendeln), danach 16 (Stabilität)
     k = 32 if games_w < 30 else 16
     prob_w = 1 / (1 + 10 ** ((rating_l - rating_w) / 400))
-    gain = max(round(k * (1 - prob_w)), 5) # Mindestens 5 Punkte pro Sieg
+    gain = max(round(k * (1 - prob_w)), 5)
     return int(rating_w + gain), int(rating_l - gain), int(gain)
 
 def get_trend(username, match_df):
@@ -62,14 +61,7 @@ def get_trend(username, match_df):
     res = "".join(icons)
     return res.ljust(10, "⚪")[:10]
 
-def get_win_streak(username, match_df):
-    if match_df.empty or 'winner_name' not in match_df.columns: return ""
-    u_m = match_df[(match_df['winner_name'] == username) | (match_df['loser_name'] == username)].tail(3)
-    if len(u_m) == 3 and all(u_m['winner_name'] == username):
-        return " 🔥"
-    return ""
-
-# --- 4. DATEN LADEN & FIX ---
+# --- 4. DATEN LADEN & STRUKTUR-CHECK ---
 players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 
@@ -97,9 +89,8 @@ with st.sidebar:
                     st.session_state.user = res.user
                     st.rerun()
                 except: st.error("Login fehlgeschlagen.")
-
     st.markdown("---")
-    st.caption("Sascha Heptner | Laufenburg")
+    st.caption("Sascha Heptner | CyberDarts 2026")
 
 # --- 6. TABS ---
 t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung", "📖 Anleitung"])
@@ -108,46 +99,44 @@ with t1:
     col_main, col_rules = st.columns([2, 1])
     with col_main:
         if players:
-            st.markdown('<div class="legend-box">🟢 Sieg | 🔴 Niederlage | ⚪ Offen</div>', unsafe_allow_html=True)
+            st.markdown('<div class="legend-box">🟢 Sieg | 🔴 Niederlage | ⚪ Offen | 🔥 3 Siege in Folge</div>', unsafe_allow_html=True)
             df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
             html = '<table style="width:100%; color:#00d4ff; border-collapse: collapse;">'
             html += '<tr style="border-bottom:2px solid #00d4ff; text-align:left;"><th>Rang</th><th>Spieler</th><th>Elo</th><th>Trend</th></tr>'
             for i, r in enumerate(df_players.itertuples(), 1):
                 icon = "🥇" if i==1 else "🥈" if i==2 else "🥉" if i==3 else f"{i}."
-                streak = get_win_streak(r.username, m_df)
                 trend = get_trend(r.username, m_df)
-                html += f'<tr style="border-bottom:1px solid #1a1c23;"><td>{icon}</td><td>{r.username}{streak}</td><td>{r.elo_score}</td><td style="letter-spacing:2px;">{trend}</td></tr>'
+                html += f'<tr style="border-bottom:1px solid #1a1c23;"><td>{icon}</td><td>{r.username}</td><td>{r.elo_score}</td><td style="letter-spacing:2px;">{trend}</td></tr>'
             st.markdown(html + '</table>', unsafe_allow_html=True)
 
     with col_rules:
         st.markdown('<div class="rule-box"><h3>📜 Kurzregeln</h3>'
-                    '• 501 Single In / Double Out<br>'
+                    '• 501 SI/DO<br>'
                     '• Best of 5 Legs<br>'
-                    '• Link von AutoDarts nötig</div>', unsafe_allow_html=True)
+                    '• Bull-Out startet<br>'
+                    '• AutoDarts Link Pflicht</div>', unsafe_allow_html=True)
 
-    st.divider()
     if st.session_state.user:
         curr_p = next((p for p in players if p['id'] == st.session_state.user.id), None)
         if curr_p:
+            st.divider()
             p_name = curr_p['username']
             st.subheader(f"📈 Dein Elo-Verlauf ({p_name})")
             if not m_df.empty:
-                hist, curr = [1200], 1200
                 p_m = m_df[(m_df['winner_name'] == p_name) | (m_df['loser_name'] == p_name)]
-                for _, row in p_m.iterrows():
-                    curr = curr + row['elo_diff'] if row['winner_name'] == p_name else curr - row['elo_diff']
-                    hist.append(curr)
-                wr = round((len(p_m[p_m['winner_name']==p_name])/len(p_m))*100) if not p_m.empty else 0
-                c1, c2 = st.columns([3, 1])
-                with c1: st.line_chart(pd.DataFrame(hist, columns=["Deine Elo"]))
-                with c2: st.markdown(f'<div class="stat-card"><small>Matches</small><h3>{len(p_m)}</h3><small>Winrate</small><h3>{wr}%</h3></div>', unsafe_allow_html=True)
-            else: st.info("Noch keine Matches vorhanden.")
+                if not p_m.empty:
+                    hist, curr = [1200], 1200
+                    for _, row in p_m.iterrows():
+                        curr = curr + row['elo_diff'] if row['winner_name'] == p_name else curr - row['elo_diff']
+                        hist.append(curr)
+                    st.line_chart(pd.DataFrame(hist, columns=["Deine Elo"]))
+                else: st.info("Noch keine Matches gespielt.")
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
     else:
         if "booking_success" not in st.session_state: st.session_state.booking_success = False
-        url = st.text_input("AutoDarts Match Link")
+        url = st.text_input("AutoDarts Match Link (https://play.autodarts.io/history/matches/...)")
         if url:
             m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_match:
@@ -164,10 +153,10 @@ with t2:
                             conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                             conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": d, "url": url}).execute()
                             st.session_state.booking_success = True; st.rerun()
-                        else: st.error("Spieler müssen unterschiedlich sein.")
+                        else: st.error("Wähle zwei verschiedene Spieler.")
                 elif st.session_state.booking_success:
-                    st.success("✅ Verbucht!"); 
-                    if st.button("Nächstes Match"): st.session_state.booking_success = False; st.rerun()
+                    st.success("✅ Match erfolgreich verbucht!")
+                    if st.button("Nächstes Match melden"): st.session_state.booking_success = False; st.rerun()
                 else: st.info("Match bereits gewertet.")
 
 with t3:
@@ -184,37 +173,57 @@ with t4:
             if st.form_submit_button("Registrieren"):
                 try:
                     conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
-                    st.success("Erfolg! Bitte einloggen.")
+                    st.success("Erfolg! Logge dich jetzt ein.")
                 except Exception as e: st.error(f"Fehler: {e}")
 
 with t5:
-    st.title("📖 Spielanleitung & System")
+    st.title("📖 Ausführliche Regeln & System")
     
     st.markdown("""
     <div class="info-card">
-        <h3>🎯 Turnierregeln</h3>
-        <p>Um die Vergleichbarkeit zu gewährleisten, gelten für alle Ranglistenspiele folgende Regeln:</p>
+        <h3>🎯 Spielmodus: 501 Single In / Double Out</h3>
         <ul>
-            <li><b>Modus:</b> 501 Punkte</li>
-            <li><b>Start/Finish:</b> Single In / Double Out</li>
-            <li><b>Siegbedingung:</b> Best of 5 Legs (Wer zuerst 3 Legs gewinnt)</li>
-            <li><b>Meldung:</b> Jedes Match muss über einen gültigen <b>AutoDarts Link</b> verifiziert werden.</li>
+            <li><b>Start:</b> Jeder Spieler startet mit 501 Punkten. Der erste Wurf muss kein spezielles Feld treffen (Single In).</li>
+            <li><b>Finish:</b> Das Leg muss mit einem Wurf in ein <b>Doppel-Feld</b> (äußerer Ring oder Bullseye) beendet werden (Double Out).</li>
+            <li><b>Distanz:</b> Gespielt wird im Modus <b>Best of 5 Legs</b>. Wer zuerst 3 Legs gewonnen hat, gewinnt das Match.</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
+    
+
+    st.markdown("""
+    <div class="info-card">
+        <h3>🪙 Wer startet? (Bull-Out)</h3>
+        <p>Vor Beginn des Matches wird ermittelt, wer das erste Leg beginnen darf:</p>
+        <ul>
+            <li>Beide Spieler werfen einen Pfeil auf das Bullseye.</li>
+            <li>Der Spieler, dessen Pfeil näher am Zentrum (Bullseye) liegt, darf entscheiden, ob er das Match beginnt.</li>
+            <li>Treffen beide das gleiche Segment (z.B. beide Single-Bull), wird der Wurf wiederholt, bis eine Entscheidung fällt.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("""
     <div class="info-card">
-        <h3>📊 Das Elo-System</h3>
-        <p>Die Rangliste basiert auf dem Elo-System. Dein Rating steigt oder fällt basierend auf deinen Ergebnissen und der Stärke deiner Gegner.</p>
+        <h3>📝 Reporting & Verifizierung</h3>
+        <p>Ergebnisse werden ausschließlich über <b>AutoDarts Match-Links</b> akzeptiert:</p>
         <ul>
-            <li><b>Start-Rating:</b> Jeder neue Spieler startet mit <b>1200 Punkten</b>.</li>
-            <li><b>Starke Gegner:</b> Ein Sieg gegen einen Spieler mit mehr Punkten bringt dir einen größeren Bonus.</li>
-            <li><b>Favoriten-Sieg:</b> Gewinnst du gegen einen deutlich schwächeren Spieler, erhältst du nur wenige Punkte.</li>
-            <li><b>K-Faktor (Dynamik):</b> In deinen ersten <b>30 Spielen</b> verändert sich deine Elo schneller (K=32), damit du zügig an deinem richtigen Platz landest. Danach stabilisiert sich dein Wert (K=16).</li>
-            <li><b>Mindestgewinn:</b> Für jeden Sieg erhältst du <b>mindestens 5 Elo-Punkte</b>.</li>
+            <li>Kopiere den Link aus deiner AutoDarts-Historie. Beispiel: <i>https://play.autodarts.io/history/matches/DEINE-ID</i></li>
+            <li>Das System extrahiert die Match-ID und stellt sicher, dass kein Spiel doppelt gewertet wird.</li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
-    
-    st.info("💡 Tipp: Fordere Spieler heraus, die über dir stehen, um schneller in der Rangliste aufzusteigen!")
+
+    st.markdown("""
+    <div class="info-card">
+        <h3>📊 Elo-Punktesystem</h3>
+        <p>Deine Platzierung berechnet sich wie folgt:</p>
+        <ul>
+            <li><b>Start:</b> 1200 Punkte.</li>
+            <li><b>Berechnung:</b> Ein Sieg gegen stärkere Gegner bringt mehr Punkte als gegen schwächere.</li>
+            <li><b>Dynamik:</b> In den ersten 30 Spielen (Einstiegsphase) gewinnst/verlierst du bis zu 32 Punkte pro Match. Danach stabilisiert sich der Wert auf max. 16 Punkte.</li>
+            <li><b>Fairness:</b> Man verliert immer exakt so viele Punkte, wie der Gegner gewinnt.</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
