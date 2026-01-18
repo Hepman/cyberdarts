@@ -25,10 +25,7 @@ st.markdown("""
         border-radius: 5px; 
         border: 2px solid #00d4ff !important;
     }
-
-    .stButton>button:hover { 
-        background-color: rgba(0, 212, 255, 0.1) !important;
-    }
+    .stButton>button:hover { background-color: rgba(0, 212, 255, 0.1) !important; }
 
     .stTextInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #1a1c23 !important;
@@ -92,15 +89,10 @@ with st.sidebar:
                 except: st.error("Login fehlgeschlagen.")
     
     st.divider()
-    with st.expander("⚖️ Impressum"):
-        st.write("**Betreiber:**")
-        st.write("Sascha Heptner")
-        st.write("Römerstr. 1, 79725 Laufenburg")
-        st.write("E-Mail: sascha@cyberdarts.de")
-    
-    with st.expander("🛡️ Datenschutz"):
-        st.write("Diese App speichert nur notwendige Daten (Username, E-Mail, Spielergebnisse) zur Erstellung des Rankings. Daten werden nicht an Dritte weitergegeben. Hosting via Streamlit & Supabase.")
-    
+    st.subheader("⚖️ Impressum")
+    st.write("Sascha Heptner  \nRömerstr. 1, 79725 Laufenburg  \nE-Mail: sascha@cyberdarts.de")
+    st.subheader("🛡️ Datenschutz")
+    st.write("Diese App speichert nur notwendige Daten (Username, E-Mail, Ergebnisse) zur Erstellung des Rankings. Hosting via Streamlit & Supabase.")
     st.divider()
     st.caption("CyberDarts © 2026")
 
@@ -111,27 +103,20 @@ t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 His
 
 with t1:
     if players:
-        # Sortierung erzwingen: Höchster Elo-Score zuerst
         df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
-        
-        # Spalten aufräumen und Rang hinzufügen
         df_display = df_players[["username", "elo_score"]].rename(columns={"username": "Spieler", "elo_score": "Elo"})
         df_display.insert(0, "Rang", range(1, len(df_display) + 1))
         
         st.write("### Aktuelle Top-Spieler")
-        
-        # Zentrierung und Breiten-Kontrolle durch Spalten-Layout
-        col_left, col_mid, col_right = st.columns([1, 2, 1])
-        with col_mid:
-            # hide_index=True sorgt dafür, dass die Zeilennummern von Pandas nicht stören
+        col_l, col_m, col_r = st.columns([1, 2, 1])
+        with col_m:
             st.dataframe(df_display, hide_index=True, use_container_width=True)
 
 with t2:
-    if not st.session_state.user: 
-        st.warning("Bitte erst einloggen.")
+    if not st.session_state.user: st.warning("Bitte erst einloggen.")
     else:
         if "booking_success" not in st.session_state: st.session_state.booking_success = False
-        url = st.text_input("Autodarts Match Link")
+        url = st.text_input("Autodarts Match Link", placeholder="https://play.autodarts.io/history/matches/xxxxx")
         if url:
             m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_match:
@@ -139,15 +124,15 @@ with t2:
                 if not any(m['id'] == mid for m in matches_data) and not st.session_state.booking_success:
                     p_map = {p['username']: p for p in players}
                     sorted_names = sorted(p_map.keys())
-                    w_n = st.selectbox("Gewinner", options=sorted_names, index=None)
+                    w_n = st.selectbox("Gewinner", options=sorted_names, index=None, placeholder="Wer hat gewonnen?")
                     curr_n = st.session_state.user.user_metadata.get('username', '')
                     d_idx = sorted_names.index(curr_n) if curr_n in sorted_names else None
-                    l_n = st.selectbox("Verlierer", options=sorted_names, index=d_idx)
+                    l_n = st.selectbox("Verlierer", options=sorted_names, index=d_idx, placeholder="Wer hat verloren?")
                     c1, c2 = st.columns(2)
                     opts = [str(i) for i in range(22)]
-                    wl_r = c1.selectbox("Legs Gewinner", options=opts, index=None)
-                    ll_r = c2.selectbox("Legs Verlierer", options=opts, index=None)
-                    if st.button("Ergebnis buchen"):
+                    wl_r = c1.selectbox("Legs Gewinner", options=opts, index=None, placeholder="-")
+                    ll_r = c2.selectbox("Legs Verlierer", options=opts, index=None, placeholder="-")
+                    if st.button("Ergebnis jetzt buchen"):
                         if w_n and l_n and wl_r and ll_r:
                             wl, ll = int(wl_r), int(ll_r)
                             if w_n != l_n and wl > ll:
@@ -181,17 +166,27 @@ with t4:
 
 with t5:
     st.header("📖 Anleitung & System")
-    st.subheader("📊 Das Elo-Ranking System")
-    st.write("Die Elo-Rangliste ist ein Bewertungssystem, das die relative Spielstärke von Spielern ausdrückt: **Höhere Zahl = stärkerer Spieler.**")
-    st.write("📌 **Das Grundprinzip:**")
-    st.write("* **Bewertung:** Jeder Spieler hat eine Zahl (Anfänger < 1000, Top-Spieler > 2000).")
-    st.write("* **Erwartungswert:** Aus der Differenz wird berechnet, wer voraussichtlich gewinnt.")
-    st.write("📌 **Anpassung:**")
-    st.write("* **Gewinn:** Deine Zahl steigt. Je stärker der Gegner, desto mehr Punkte gewinnst du.")
-    st.write("* **Verlust:** Deine Zahl sinkt. Verlierst du gegen einen schwächeren Spieler, verlierst du mehr Punkte.")
+    st.write("Die Elo-Rangliste ist ein Bewertungssystem, das die relative Spielstärke von Spielern in einem Spiel (wie Schach oder Tischtennis) durch eine Zahl (die Elo-Zahl) ausdrückt: Höhere Zahl = stärkerer Spieler. Nach jedem Spiel werden Punkte zwischen den Spielern umverteilt, basierend auf dem Ergebnis im Vergleich zur erwarteten Punktzahl (die sich aus der Differenz der Elo-Zahlen ergibt) – wer mehr gewinnt als erwartet, gewinnt Elo-Punkte, wer weniger gewinnt, verliert.")
+    
+    st.subheader("Das Grundprinzip:")
+    st.write("**Bewertung:** Jeder Spieler hat eine Zahl, die seine Spielstärke repräsentiert (z. B. Anfänger < 1000, überdurchschnittlich 1400-1599).")
+    st.write("**Erwartungswert:** Aus der Differenz der Elo-Zahlen zweier Spieler wird berechnet, wie viele Punkte der eine gegen den anderen voraussichtlich holen wird (z. B. 12 Elo-Punkte Differenz = 1 Prozentpunkt Unterschied in der Gewinnerwartung).")
+    
+    st.subheader("Anpassung:")
+    st.write("* **Gewinnt ein Spieler mehr als erwartet:** Seine Elo-Zahl steigt, da er besser als gedacht war.")
+    st.write("* **Gewinnt ein Spieler weniger als erwartet:** Seine Elo-Zahl sinkt.")
+    st.write("* **Punktetransfer:** Die Punkte werden typischerweise zwischen den Spielern umverteilt. Der Verlierer gibt Punkte an den Gewinner ab.")
+    st.write("* **Anwendung:** Das System wird in vielen Spielen genutzt, um die Spielstärke zu vergleichen und faire Matches zu ermöglichen, da es die Spielstärke objektiv abbildet.")
+    
+    st.subheader("Einfaches Beispiel:")
+    st.write("Spieler A (1600 Elo) spielt gegen Spieler B (1400 Elo).")
+    st.write("Erwartung: Spieler A wird voraussichtlich mehr Punkte erzielen.")
+    st.write("* **Gewinnt A:** Seine Zahl steigt leicht, B verliert leicht.")
+    st.write("* **Gewinnt B (Überraschung!):** A verliert viele Punkte, B gewinnt viele Punkte.")
+
     st.divider()
     st.subheader("🎯 CyberDarts Spezial: Leg-Gewichtung")
-    st.write("Ein glatter Sieg wird bei uns belohnt:")
-    st.write("* 🏆 **3:0 Sieg:** 120% Elo-Gewinn")
-    st.write("* 📈 **3:1 Sieg:** 100% Elo-Gewinn")
-    st.write("* ⚖️ **3:2 Sieg:** 80% Elo-Gewinn")
+    st.write("Um die Dominanz in einem Match zu belohnen, nutzt CyberDarts zusätzlich einen Multiplikator für das Leg-Ergebnis:")
+    st.write("* **3:0 Sieg:** 120% Elo-Gewinn (Dominanz-Bonus)")
+    st.write("* **3:1 Sieg:** 100% Elo-Gewinn (Standard)")
+    st.write("* **3:2 Sieg:** 80% Elo-Gewinn (Knapper Sieg)")
