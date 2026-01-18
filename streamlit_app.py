@@ -71,7 +71,7 @@ players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 m_df = pd.DataFrame(matches_data) if matches_data else pd.DataFrame(columns=['id', 'winner_name', 'loser_name', 'elo_diff', 'url', 'created_at', 'winner_legs', 'loser_legs'])
 
-# --- 5. SIDEBAR (MENÜ, LOGIN, IMPRESSUM & DATENSCHUTZ) ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("🎯 Menü")
     if st.session_state.user:
@@ -111,8 +111,20 @@ t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 His
 
 with t1:
     if players:
+        # Sortierung erzwingen: Höchster Elo-Score zuerst
         df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
-        st.table(df_players[["username", "elo_score"]].rename(columns={"username": "Spieler", "elo_score": "Elo"}))
+        
+        # Spalten aufräumen und Rang hinzufügen
+        df_display = df_players[["username", "elo_score"]].rename(columns={"username": "Spieler", "elo_score": "Elo"})
+        df_display.insert(0, "Rang", range(1, len(df_display) + 1))
+        
+        st.write("### Aktuelle Top-Spieler")
+        
+        # Zentrierung und Breiten-Kontrolle durch Spalten-Layout
+        col_left, col_mid, col_right = st.columns([1, 2, 1])
+        with col_mid:
+            # hide_index=True sorgt dafür, dass die Zeilennummern von Pandas nicht stören
+            st.dataframe(df_display, hide_index=True, use_container_width=True)
 
 with t2:
     if not st.session_state.user: 
@@ -121,7 +133,7 @@ with t2:
         if "booking_success" not in st.session_state: st.session_state.booking_success = False
         url = st.text_input("Autodarts Match Link")
         if url:
-            m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
+            m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_match:
                 mid = m_id_match.group(1)
                 if not any(m['id'] == mid for m in matches_data) and not st.session_state.booking_success:
