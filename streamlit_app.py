@@ -10,42 +10,20 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# CSS für das Cyber-Design (Vollständige Kontrolle über die Tabellen-Optik)
+# CSS für das Cyber-Design (Nur notwendige Styles für Outline-Look und Farben)
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3, h4 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    /* Custom Cyber Table Styling */
-    .cyber-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 25px 0;
-        font-size: 1.1em;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background-color: #1a1c23;
-        border: 1px solid #333;
-        border-radius: 8px;
-        overflow: hidden;
+    /* Tabellenüberschriften in Hellblau */
+    [data-testid="stTable"] thead tr th, [data-testid="stDataFrame"] th, [role="columnheader"] p {
+        color: #00d4ff !important;
+        font-weight: bold !important;
     }
-    .cyber-table thead tr {
-        background-color: #1a1c23;
-        color: #00d4ff;
-        text-align: left;
-        border-bottom: 2px solid #00d4ff;
-    }
-    .cyber-table th, .cyber-table td {
-        padding: 12px 15px;
-        border-bottom: 1px solid #333;
-    }
-    .cyber-table tbody tr:hover {
-        background-color: rgba(0, 212, 255, 0.05);
-    }
-    .text-center { text-align: center; }
-    .text-cyan { color: #00d4ff; font-weight: bold; }
 
-    /* Button Styling */
+    /* Outline Buttons */
     .stButton>button { 
         background-color: transparent !important; 
         color: #00d4ff !important; 
@@ -57,6 +35,7 @@ st.markdown("""
     }
     .stButton>button:hover { background-color: rgba(0, 212, 255, 0.1) !important; }
 
+    /* Input Felder */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #1a1c23 !important;
         color: #00d4ff !important;
@@ -143,23 +122,23 @@ with t1:
     if players:
         st.write("🟢 Sieg | 🔴 Niederlage | ⚪ Offen")
         df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
+        df_players['Trend'] = df_players['username'].apply(lambda x: get_trend(x, m_df))
         
-        # HTML Tabelle manuell zusammenbauen für perfektes Design
-        html_table = '<div style="max-width:800px; margin:auto;"><table class="cyber-table">'
-        html_table += '<thead><tr><th class="text-center">Rang</th><th>Spieler</th><th class="text-center">Elo</th><th>Trend</th></tr></thead><tbody>'
+        df_display = df_players[["username", "elo_score", "Trend"]].rename(columns={"username": "Spieler", "elo_score": "Elo"})
+        df_display.insert(0, "Rang", range(1, len(df_display) + 1))
         
-        for i, row in enumerate(df_players.itertuples(), 1):
-            trend = get_trend(row.username, m_df)
-            html_table += f'''
-            <tr>
-                <td class="text-center text-cyan">{i}</td>
-                <td>{row.username}</td>
-                <td class="text-center">{row.elo_score}</td>
-                <td style="letter-spacing: 2px;">{trend}</td>
-            </tr>
-            '''
-        html_table += '</tbody></table></div>'
-        st.markdown(html_table, unsafe_allow_html=True)
+        col_l, col_m, col_r = st.columns([1, 4, 1])
+        with col_m:
+            st.dataframe(
+                df_display, 
+                hide_index=True, 
+                use_container_width=True,
+                column_config={
+                    "Rang": st.column_config.Column(width="small"),
+                    "Elo": st.column_config.NumberColumn(format="%d", help="Elo-Score"),
+                    "Trend": st.column_config.Column(width="medium")
+                }
+            )
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
@@ -216,23 +195,19 @@ with t4:
 with t5:
     st.header("📖 Anleitung & System")
     st.write("Die Elo-Rangliste ist ein Bewertungssystem, das die relative Spielstärke von Spielern in einem Spiel (wie Schach oder Tischtennis) durch eine Zahl (die Elo-Zahl) ausdrückt: Höhere Zahl = stärkerer Spieler. Nach jedem Spiel werden Punkte zwischen den Spielern umverteilt, basierend auf dem Ergebnis im Vergleich zur erwarteten Punktzahl (die sich aus der Differenz der Elo-Zahlen ergibt) – wer mehr gewinnt als erwartet, gewinnt Elo-Punkte, wer weniger gewinnt, verliert.")
-    
-    st.subheader("Das Grundprinzip:")
-    st.write("**Bewertung:** Jeder Spieler hat eine Zahl, die seine Spielstärke repräsentiert (z. B. Anfänger < 1000, überdurchschnittlich 1400-1599).")
-    st.write("**Erwartungswert:** Aus der Differenz der Elo-Zahlen zweier Spieler wird berechnet, wie viele Punkte der eine gegen den anderen voraussichtlich holen wird (z. B. 12 Elo-Punkte Differenz = 1 Prozentpunkt Unterschied in der Gewinnerwartung).")
-    
-    st.subheader("Anpassung:")
+    st.write("**Das Grundprinzip:**")
+    st.write("* **Bewertung:** Jeder Spieler hat eine Zahl, die seine Spielstärke repräsentiert (z. B. Anfänger < 1000, überdurchschnittlich 1400-1599).")
+    st.write("* **Erwartungswert:** Aus der Differenz der Elo-Zahlen zweier Spieler wird berechnet, wie viele Punkte der eine gegen den anderen voraussichtlich holen wird (z. B. 12 Elo-Punkte Differenz = 1 Prozentpunkt Unterschied in der Gewinnerwartung).")
+    st.write("**Anpassung:**")
     st.write("* **Gewinnt ein Spieler mehr als erwartet:** Seine Elo-Zahl steigt, da er besser als gedacht war.")
     st.write("* **Gewinnt ein Spieler weniger als erwartet:** Seine Elo-Zahl sinkt.")
     st.write("* **Punktetransfer:** Die Punkte werden typischerweise zwischen den Spielern umverteilt. Der Verlierer gibt Punkte an den Gewinner ab.")
     st.write("* **Anwendung:** Das System wird in vielen Spielen genutzt, um die Spielstärke zu vergleichen und faire Matches zu ermöglichen, da es die Spielstärke objektiv abbildet.")
-    
-    st.subheader("Einfaches Beispiel:")
+    st.write("**Einfaches Beispiel:**")
     st.write("Spieler A (1600 Elo) spielt gegen Spieler B (1400 Elo).")
     st.write("Erwartung: Spieler A wird voraussichtlich mehr Punkte erzielen.")
     st.write("* **Gewinnt A:** Seine Zahl steigt leicht, B verliert leicht.")
     st.write("* **Gewinnt B (Überraschung!):** A verliert viele Punkte, B gewinnt viele Punkte.")
-
     st.divider()
     st.subheader("🎯 CyberDarts Spezial: Leg-Gewichtung")
     st.write("Um die Dominanz in einem Match zu belohnen, nutzt CyberDarts zusätzlich einen Multiplikator für das Leg-Ergebnis:")
