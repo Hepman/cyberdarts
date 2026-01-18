@@ -10,13 +10,26 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# CSS für das Cyber-Design
+# CSS für das Cyber-Design (Inklusive blauer Tabellenköpfe)
 st.markdown("""
 <style>
+    /* Grund-Design */
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3, h4 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
+    /* Tabellenköpfe (Headers) anpassen */
+    thead tr th {
+        color: #00d4ff !important;
+        background-color: #1a1c23 !important;
+    }
+    
+    /* Dataframe Header spezifisch für Streamlit */
+    [data-testid="stTable"] thead th, [data-testid="stDataFrame"] th {
+        color: #00d4ff !important;
+    }
+
+    /* ALLE BUTTONS ALS OUTLINE VERSION */
     .stButton>button { 
         background-color: transparent !important; 
         color: #00d4ff !important; 
@@ -24,6 +37,7 @@ st.markdown("""
         width: 100%; 
         border-radius: 5px; 
         border: 2px solid #00d4ff !important;
+        transition: 0.3s;
     }
     .stButton>button:hover { background-color: rgba(0, 212, 255, 0.1) !important; }
 
@@ -67,7 +81,6 @@ def get_trend(username, match_df):
     if match_df.empty or 'winner_name' not in match_df.columns: 
         return "⚪" * 10
     u_m = match_df[(match_df['winner_name'] == username) | (match_df['loser_name'] == username)]
-    # Die letzten 10 Spiele des Users nehmen
     icons = ["🟢" if m['winner_name'] == username else "🔴" for _, m in u_m.tail(10).iloc[::-1].iterrows()]
     res = "".join(icons)
     return res.ljust(10, "⚪")[:10]
@@ -114,14 +127,11 @@ with t1:
     if players:
         st.write("🟢 Sieg | 🔴 Niederlage | ⚪ Offen")
         df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
-        
-        # Trend für jeden Spieler berechnen
         df_players['Trend'] = df_players['username'].apply(lambda x: get_trend(x, m_df))
         
         df_display = df_players[["username", "elo_score", "Trend"]].rename(columns={"username": "Spieler", "elo_score": "Elo"})
         df_display.insert(0, "Rang", range(1, len(df_display) + 1))
         
-        st.write("### Aktuelle Top-Spieler")
         col_l, col_m, col_r = st.columns([1, 4, 1])
         with col_m:
             st.dataframe(df_display, hide_index=True, use_container_width=True)
@@ -151,7 +161,7 @@ with t2:
                             wl, ll = int(wl_r), int(ll_r)
                             if w_n != l_n and wl > ll:
                                 pw, pl = p_map[w_n], p_map[l_n]
-                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'], wl, ll)
+                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pw['games_played'], wl, ll)
                                 conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
                                 conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                                 conn.table("matches").insert({"id": mid, "winner_name": w_n, "loser_name": l_n, "elo_diff": d, "url": url, "winner_legs": wl, "loser_legs": ll}).execute()
