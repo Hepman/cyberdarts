@@ -10,7 +10,6 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# SEO Meta-Tags & Forced Dark Mode
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
@@ -21,8 +20,6 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #0e1117 !important; border-right: 1px solid #333; }
     .legend-box, .rule-box, .info-card { background-color: #1a1c23; padding: 15px; border-radius: 8px; border-left: 5px solid #00d4ff; margin-bottom: 20px; }
     .badge { background-color: #00d4ff; color: #0e1117; padding: 2px 8px; border-radius: 10px; font-weight: bold; font-size: 0.8em; }
-    .stTabs [data-baseweb="tab"] { color: #888 !important; }
-    .stTabs [aria-selected="true"] { color: #00d4ff !important; border-bottom-color: #00d4ff !important; }
 </style>
 <div style="text-align: center;">
     <h1>🎯 CyberDarts Community Ranking</h1>
@@ -39,23 +36,18 @@ def init_connection():
 
 conn = init_connection()
 
+# Initialisiere Session State für User
 if "user" not in st.session_state:
     st.session_state.user = None
 
 # --- 3. HELPER FUNKTIONEN ---
 def calculate_elo_advanced(rating_w, rating_l, games_w, games_l, winner_legs, loser_legs):
-    # K-Faktor Logik
     k = 32 if games_w < 30 else 16
-    
-    # Erwartungswert
     prob_w = 1 / (1 + 10 ** ((rating_l - rating_w) / 400))
-    
-    # Margin of Victory Faktor (MoV)
     diff = winner_legs - loser_legs
-    if diff >= 3: margin_factor = 1.2    # Dominant (z.B. 3:0)
-    elif diff == 2: margin_factor = 1.0  # Normal (z.B. 3:1)
-    else: margin_factor = 0.8            # Knapp (z.B. 3:2)
-    
+    if diff >= 3: margin_factor = 1.2
+    elif diff == 2: margin_factor = 1.0
+    else: margin_factor = 0.8
     gain = max(round(k * (1 - prob_w) * margin_factor), 5)
     return int(rating_w + gain), int(rating_l - gain), int(gain)
 
@@ -72,25 +64,30 @@ players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 m_df = pd.DataFrame(matches_data) if matches_data else pd.DataFrame(columns=['id', 'winner_name', 'loser_name', 'elo_diff', 'url', 'created_at', 'winner_legs', 'loser_legs'])
 
-# --- 5. SIDEBAR MIT IMPRESSUM ---
+# --- 5. SIDEBAR MIT KORRIGIERTEM LOGIN ---
 with st.sidebar:
     st.title("🎯 Menü")
+    
     if st.session_state.user:
-        u_email = str(st.session_state.user.email).strip().lower()
-        st.write(f"Login: **{u_email}**")
+        st.write(f"Login: **{st.session_state.user.email}**")
         if st.button("Abmelden"):
-            conn.client.auth.sign_out()
+            conn.auth.sign_out()
             st.session_state.user = None
             st.rerun()
     else:
         with st.form("login_form"):
-            le, lp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
+            le = st.text_input("E-Mail").strip().lower()
+            lp = st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
                 try:
-                    res = conn.client.auth.sign_in_with_password({"email": le.strip().lower(), "password": lp})
-                    st.session_state.user = res.user
-                    st.rerun()
-                except: st.error("Login fehlgeschlagen.")
+                    # Direkter Zugriff auf den Auth-Client der Connection
+                    auth_res = conn.auth.sign_in_with_password({"email": le, "password": lp})
+                    if auth_res.user:
+                        st.session_state.user = auth_res.user
+                        st.success("Erfolgreich eingeloggt!")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Login Fehler: Passwort oder E-Mail falsch.")
 
     st.markdown("---")
     with st.expander("⚖️ Impressum & Rechtliches"):
@@ -101,7 +98,6 @@ with st.sidebar:
         sascha@cyberdarts.de  
 
         CyberDarts © 2026  
-        *Unabhängiges Community-Projekt*
         """)
 
 # --- 6. TABS ---
@@ -124,14 +120,15 @@ with t1:
         st.markdown('<div class="rule-box"><h3>📜 Kurzregeln</h3>501 SI/DO | Bo5<br>Bull-Out startet Match<br>KI-Referee Pflicht</div>', unsafe_allow_html=True)
 
 with t2:
-    if not st.session_state.user: st.warning("Bitte erst einloggen.")
+    if not st.session_state.user: 
+        st.warning("Bitte erst einloggen.")
     else:
         if "booking_success" not in st.session_state: st.session_state.booking_success = False
         url = st.text_input("AutoDarts Match Link")
         if url:
-            m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
+            m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_match:
-                mid = m_id_match.group(1)
+                mid = m_id_match.group(0)
                 if not any(m['id'] == mid for m in matches_data) and not st.session_state.booking_success:
                     p_map = {p['username']: p for p in players}
                     w = st.selectbox("Gewinner", sorted(p_map.keys()))
@@ -169,9 +166,9 @@ with t4:
             ru = st.text_input("Dein Name bei Autodarts")
             if st.form_submit_button("Registrieren"):
                 try:
-                    conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
+                    conn.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
                     st.success("Erfolg! Bitte einloggen.")
-                except Exception as e: st.error(f"Fehler: {e}")
+                except Exception as e: st.error(f"Fehler bei Registrierung.")
 
 with t5:
     st.markdown('<div class="info-card"><h3>🎯 System-Info</h3>Dieses Ranking nutzt ein gewichtetes Elo-System. Deutliche Siege (3:0) bringen mehr Punkte als knappe (3:2).</div>', unsafe_allow_html=True)
