@@ -16,7 +16,7 @@ st.markdown("""
     /* Grund-Design */
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
-    h1, h2, h3 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
+    h1, h2, h3, h4 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
     /* ALLE BUTTONS ALS OUTLINE VERSION */
     .stButton>button { 
@@ -51,7 +51,7 @@ st.markdown("""
         border-left: 5px solid #00d4ff; margin-bottom: 20px;
     }
     
-    /* OUTLINE BADGE FÜR ELO-DIFF IN DER HISTORIE */
+    /* OUTLINE BADGE FÜR ELO-DIFF */
     .badge-outline {
         color: #00d4ff; 
         padding: 2px 10px; 
@@ -62,6 +62,8 @@ st.markdown("""
         display: inline-block;
         margin-left: 10px;
     }
+
+    .info-card h4 { margin-top: 15px; margin-bottom: 5px; }
 </style>
 
 <div style="text-align: center;">
@@ -108,7 +110,7 @@ players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 m_df = pd.DataFrame(matches_data) if matches_data else pd.DataFrame(columns=['id', 'winner_name', 'loser_name', 'elo_diff', 'url', 'created_at', 'winner_legs', 'loser_legs'])
 
-# --- 5. SIDEBAR (MENÜ & LOGIN) ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("🎯 Menü")
     if st.session_state.user:
@@ -127,10 +129,8 @@ with st.sidebar:
                     st.session_state.user = res.user
                     st.rerun()
                 except: st.error("Login fehlgeschlagen.")
-
     st.markdown("---")
-    with st.expander("⚖️ Impressum"):
-        st.caption(f"**Sascha Heptner**\nRömerstr. 1\n79725 Laufenburg\n\nCyberDarts © 2026")
+    st.caption("**Sascha Heptner** | CyberDarts © 2026")
 
 # --- 6. TABS ---
 t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung", "📖 Anleitung"])
@@ -149,23 +149,13 @@ with t1:
                 html += f'<tr style="border-bottom:1px solid #1a1c23;"><td>{icon}</td><td>{r.username}</td><td>{r.elo_score}</td><td style="letter-spacing:2px;">{trend}</td></tr>'
             st.markdown(html + '</table>', unsafe_allow_html=True)
     with col_rules:
-        st.markdown(f'''<div class="rule-box"><h3>📜 Kurzregeln</h3>
-        • 501 SI/DO | Bo5 Legs<br>
-        • Bull-Out startet Match<br>
-        • Elo-Gewichtung nach Legs</div>''', unsafe_allow_html=True)
+        st.markdown('<div class="rule-box"><h3>📜 Kurzregeln</h3>• 501 SI/DO | Bo5 Legs<br>• Bull-Out startet Match<br>• Meldung durch Gewinner</div>', unsafe_allow_html=True)
 
 with t2:
-    if not st.session_state.user: 
-        st.warning("Bitte erst einloggen.")
+    if not st.session_state.user: st.warning("Bitte erst einloggen.")
     else:
-        if "booking_success" not in st.session_state: 
-            st.session_state.booking_success = False
-        
-        url = st.text_input(
-            "Autodarts Match Link", 
-            placeholder="https://play.autodarts.io/history/matches/xxxxx"
-        )
-        
+        if "booking_success" not in st.session_state: st.session_state.booking_success = False
+        url = st.text_input("Autodarts Match Link", placeholder="https://play.autodarts.io/history/matches/...")
         if url:
             m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_match:
@@ -173,21 +163,17 @@ with t2:
                 if not any(m['id'] == mid for m in matches_data) and not st.session_state.booking_success:
                     p_map = {p['username']: p for p in players}
                     sorted_names = sorted(p_map.keys())
-                    
                     winner_name = st.selectbox("Gewinner", options=sorted_names, index=None, placeholder="Wer hat gewonnen?")
-                    
                     current_user_name = st.session_state.user.user_metadata.get('username', '')
                     default_idx = sorted_names.index(current_user_name) if current_user_name in sorted_names else None
                     loser_name = st.selectbox("Verlierer", options=sorted_names, index=default_idx, placeholder="Wer hat verloren?")
-                    
                     col_l1, col_l2 = st.columns(2)
                     leg_options = [str(i) for i in range(22)]
                     w_legs_raw = col_l1.selectbox("Legs Gewinner", options=leg_options, index=None, placeholder="-")
                     l_legs_raw = col_l2.selectbox("Legs Verlierer", options=leg_options, index=None, placeholder="-")
-                    
                     if st.button("Ergebnis jetzt buchen"):
                         if not winner_name or not loser_name or w_legs_raw is None or l_legs_raw is None:
-                            st.error("Bitte fülle alle Felder aus!")
+                            st.error("Bitte alle Felder ausfüllen!")
                         else:
                             w_legs, l_legs = int(w_legs_raw), int(l_legs_raw)
                             if winner_name != loser_name and w_legs > l_legs:
@@ -195,23 +181,18 @@ with t2:
                                 nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'], w_legs, l_legs)
                                 conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
                                 conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
-                                conn.table("matches").insert({
-                                    "id": mid, "winner_name": winner_name, "loser_name": loser_name, 
-                                    "elo_diff": d, "url": url, "winner_legs": w_legs, "loser_legs": l_legs
-                                }).execute()
+                                conn.table("matches").insert({"id": mid, "winner_name": winner_name, "loser_name": loser_name, "elo_diff": d, "url": url, "winner_legs": w_legs, "loser_legs": l_legs}).execute()
                                 st.session_state.booking_success = True; st.rerun()
-                            else: st.error("Prüfe die Angaben.")
+                            else: st.error("Eingaben prüfen.")
                 elif st.session_state.booking_success:
-                    st.success("✅ Match erfolgreich verbucht!"); 
-                    if st.button("Nächstes Match melden"): 
-                        st.session_state.booking_success = False; st.rerun()
+                    st.success("✅ Match verbucht!"); 
+                    if st.button("Nächstes Match melden"): st.session_state.booking_success = False; st.rerun()
 
 with t3:
     st.write("### 📅 Historie (Letzte 15)")
     if not m_df.empty:
         for m in matches_data[::-1][:15]:
             score = f"({m.get('winner_legs', 3)}:{m.get('loser_legs', 0)})"
-            # HIER DIE ÄNDERUNG: Nutze badge-outline Klasse
             st.markdown(f"**{m['winner_name']}** {score} vs {m['loser_name']} <span class='badge-outline'>+{m['elo_diff']} Elo</span>", unsafe_allow_html=True)
             st.divider()
 
@@ -219,7 +200,7 @@ with t4:
     if not st.session_state.user:
         with st.form("reg"):
             re, rp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
-            ru = st.text_input("Name bei Autodarts (exakt!)")
+            ru = st.text_input("Username bei Autodarts")
             if st.form_submit_button("Registrieren"):
                 try:
                     conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
@@ -227,9 +208,49 @@ with t4:
                 except Exception as e: st.error(f"Fehler: {e}")
 
 with t5:
-    st.markdown("""
+    st.title("📖 Anleitung & System")
+    
+    # DEIN NEUER TEXT ZUM ELO-SYSTEM
+    st.markdown(f"""
     <div class="info-card">
-        <h3>🎯 Das CyberDarts Elo-System</h3>
-        <p>Dominante Siege (3:0) werden stärker gewichtet als knappe Spiele (3:2).</p>
+        <h3>📊 Das Elo-Ranking System</h3>
+        <p>Die Elo-Rangliste ist ein Bewertungssystem, das die relative Spielstärke von Spielern ausdrückt: 
+        <b>Höhere Zahl = stärkerer Spieler.</b> Nach jedem Spiel werden Punkte zwischen den Spielern umverteilt, 
+        basierend auf dem Ergebnis im Vergleich zur erwarteten Punktzahl.</p>
+        
+        <h4>Das Grundprinzip:</h4>
+        <ul>
+            <li><b>Bewertung:</b> Jeder Spieler hat eine Zahl (z. B. Anfänger < 1000, überdurchschnittlich 1400-1599).</li>
+            <li><b>Erwartungswert:</b> Aus der Differenz der Elo-Zahlen zweier Spieler wird berechnet, wie viele Punkte der eine gegen den anderen voraussichtlich holen wird.</li>
+        </ul>
+
+        <h4>Anpassung:</h4>
+        <ul>
+            <li><b>Gewinnt ein Spieler mehr als erwartet:</b> Seine Elo-Zahl steigt, da er besser als gedacht war.</li>
+            <li><b>Gewinnt ein Spieler weniger als erwartet:</b> Seine Elo-Zahl sinkt.</li>
+            <li><b>Punktetransfer:</b> Die Punkte werden typischerweise zwischen den Spielern umverteilt. Der Verlierer gibt Punkte an den Gewinner ab.</li>
+        </ul>
+
+        <h4>Einfaches Beispiel:</h4>
+        <p>Spieler A (1600 Elo) spielt gegen Spieler B (1400 Elo).<br>
+        <i>Erwartung:</i> Spieler A wird voraussichtlich gewinnen.</p>
+        <ul>
+            <li><b>Gewinnt A:</b> Seine Zahl steigt leicht, B verliert leicht.</li>
+            <li><b>Gewinnt B (Überraschung!):</b> A verliert viele Punkte, B gewinnt viele Punkte.</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
+    
+
+    st.markdown(f"""
+    <div class="info-card">
+        <h3>🎯 CyberDarts Spezial: Leg-Gewichtung</h3>
+        <p>Um die Dominanz in einem Match zu belohnen, nutzt CyberDarts zusätzlich einen Multiplikator für das Leg-Ergebnis:</p>
+        <ul>
+            <li><b>3:0 Sieg:</b> 120% Elo-Gewinn (Dominanz-Bonus)</li>
+            <li><b>3:1 Sieg:</b> 100% Elo-Gewinn (Standard)</li>
+            <li><b>3:2 Sieg:</b> 80% Elo-Gewinn (Knapper Sieg)</li>
+        </ul>
     </div>
     """, unsafe_allow_html=True)
