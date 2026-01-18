@@ -5,36 +5,25 @@ import re
 
 # --- 1. SETUP & SEO OPTIMIERUNG ---
 st.set_page_config(
-    page_title="CyberDarts | Das Autodarts Elo-Ranking", 
+    page_title="CyberDarts | Unabhängiges Autodarts Community Ranking", 
     layout="wide", 
     page_icon="🎯"
 )
 
-# SEO Meta-Tags & Forced Dark Mode CSS
+# SEO Meta-Tags & Forced Dark Mode
 st.markdown("""
 <head>
-    <meta name="description" content="CyberDarts - Die Ranking-Plattform für Autodarts-Spieler. Verfolge dein Elo-Rating und steige im Leaderboard auf.">
+    <meta name="description" content="CyberDarts: Das unabhängige Elo-Ranking für die Autodarts Community. Verfolge deine Statistiken und steige in der Rangliste auf. Nicht offiziell mit Autodarts GmbH verbunden.">
     <meta name="keywords" content="Autodarts, Darts Ranking, Elo Score, 501 Darts, Dart Rangliste, CyberDarts, Sascha Heptner">
     <meta name="author" content="Sascha Heptner">
     <meta name="robots" content="index, follow">
 </head>
 <style>
     /* Erzwingt dunklen Hintergrund */
-    .stApp { 
-        background-color: #0e1117 !important; 
-        color: #00d4ff !important; 
-    }
-    
-    /* Fix für Texte */
+    .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
-
-    /* Header & Titel */
-    h1, h2, h3 { 
-        color: #00d4ff !important; 
-        text-shadow: 0 0 10px #00d4ff; 
-    }
-
-    /* Buttons */
+    h1, h2, h3 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
+    
     .stButton>button { 
         background-color: #00d4ff !important; 
         color: #0e1117 !important; 
@@ -44,20 +33,17 @@ st.markdown("""
         border: none;
     }
 
-    /* Eingabefelder */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #1a1c23 !important;
         color: #00d4ff !important;
         border: 1px solid #00d4ff !important;
     }
 
-    /* Sidebar */
     [data-testid="stSidebar"] {
         background-color: #0e1117 !important;
         border-right: 1px solid #333;
     }
 
-    /* Info-Boxen */
     .legend-box, .rule-box, .info-card {
         background-color: #1a1c23; padding: 15px; border-radius: 8px; 
         border-left: 5px solid #00d4ff; margin-bottom: 20px;
@@ -68,13 +54,15 @@ st.markdown("""
         border-radius: 10px; font-weight: bold; font-size: 0.8em;
     }
     
-    /* Tabs */
     .stTabs [data-baseweb="tab"] { color: #888 !important; }
     .stTabs [aria-selected="true"] { color: #00d4ff !important; border-bottom-color: #00d4ff !important; }
 </style>
 
-<h1 style='text-align: center;'>🎯 CyberDarts: Autodarts Ranking Community</h1>
-<p style='text-align: center; font-style: italic;'>Das unabhängige Leaderboard für ambitionierte Autodarts-Spieler.</p>
+<div style="text-align: center;">
+    <h1>🎯 CyberDarts Community Ranking</h1>
+    <p style="font-size: 1.1rem; color: #00d4ff;">Willkommen bei CyberDarts – hier findest du das aktuelle Leaderboard der Autodarts-Spieler basierend auf dem Elo-System.</p>
+    <p style="font-size: 0.9rem; opacity: 0.7; font-style: italic;">(Unabhängiges Fan-Projekt – steht in keiner geschäftlichen Verbindung zur Autodarts GmbH)</p>
+</div>
 """, unsafe_allow_html=True)
 
 # --- 2. DATENBANK-VERBINDUNG ---
@@ -115,7 +103,7 @@ else:
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
-    st.title("🎯 CyberDarts")
+    st.title("🎯 Menü")
     if st.session_state.user:
         u_email = str(st.session_state.user.email).strip().lower()
         st.write(f"Login: **{u_email}**")
@@ -135,7 +123,7 @@ with st.sidebar:
 
     st.markdown("---")
     with st.expander("⚖️ Impressum"):
-        st.caption("**Sascha Heptner**\nRömerstr. 1\n79725 Laufenburg\nsascha@cyberdarts.de\n\nCyberDarts © 2026")
+        st.caption(f"**Sascha Heptner**\nRömerstr. 1\n79725 Laufenburg\nsascha@cyberdarts.de\n\nCyberDarts © 2026")
 
 # --- 6. TABS ---
 t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung", "📖 Anleitung"])
@@ -206,7 +194,7 @@ with t4:
 
 with t5:
     st.title("📖 Anleitung & System")
-    st.markdown("""
+    st.markdown(f"""
     <div class="info-card">
         <h3>🎯 Spielmodus & Referee</h3>
         <ul>
@@ -225,14 +213,12 @@ with t5:
     
     <div style="margin-top: 30px; border-top: 1px solid #333; padding-top: 20px; opacity: 0.8; font-size: 0.9rem;">
         <h4>Über CyberDarts</h4>
-        <p>CyberDarts ist die Community-Plattform für <b>Autodarts-Spieler</b>, die ein faires <b>Elo-Ranking</b> suchen. 
-        Wir fördern den Wettbewerb in der deutschen <b>Autodarts Community</b> durch Transparenz und Leistung.</p>
+        <p>CyberDarts ist eine unabhängige Plattform für die <b>Autodarts Community</b>. Wir bieten ein transparentes <b>Elo-Ranking</b>, um den sportlichen Wettbewerb zu fördern.</p>
     </div>
 
     <div style="margin-top: 50px; padding: 15px; background-color: #0e1117; border: 1px solid #333; border-radius: 8px; font-size: 0.85rem; color: #888;">
         <b>Rechtlicher Hinweis:</b><br>
-        CyberDarts ist ein unabhängiges Community-Projekt von <b>Sascha Heptner</b> und steht in keiner geschäftlichen oder rechtlichen Verbindung zur Autodarts GmbH. 
-        Die Nutzung von AutoDarts-Links dient dem manuellen Nachweis privat gespielter Matches. 
-        Alle Rechte an der Marke Autodarts liegen bei der Autodarts GmbH.
+        CyberDarts ist ein unabhängiges Community-Projekt von <b>Sascha Heptner</b> und steht in <b>keiner geschäftlichen oder rechtlichen Verbindung</b> zur Autodarts GmbH. 
+        Die Markenrechte an "Autodarts" liegen ausschließlich bei der Autodarts GmbH. Die Nutzung von Match-Links dient lediglich dem manuellen Ergebnisnachweis.
     </div>
     """, unsafe_allow_html=True)
