@@ -10,34 +10,48 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# SEO Meta-Tags & Verbessertes Button-CSS für einheitliches Design
+# SEO Meta-Tags & Aggressives CSS für absolut identische Buttons
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    /* Einheitliches Styling für ALLE Buttons (Login & Logout) */
-    button[kind="primary"], button[kind="secondary"], .stButton>button {
+    /* Radikaler Reset für ALLE Streamlit Buttons (Form & Normal) */
+    div.stButton > button, 
+    div.stFormSubmitButton > button,
+    button[kind="secondaryFormSubmit"],
+    button[kind="primaryFormSubmit"],
+    button[kind="secondary"],
+    button[kind="primary"] {
         background-color: #00d4ff !important;
         color: #0e1117 !important;
         font-weight: bold !important;
         width: 100% !important;
         border-radius: 5px !important;
         border: none !important;
-        height: 3em !important;
+        height: 45px !important;
+        line-height: 45px !important;
+        padding: 0px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
         transition: all 0.3s ease !important;
+        text-transform: none !important;
     }
     
-    /* Hover-Effekt für alle Buttons */
-    button[kind="primary"]:hover, button[kind="secondary"]:hover, .stButton>button:hover {
+    /* Hover-Effekt für absolut alle Buttons */
+    div.stButton > button:hover, 
+    div.stFormSubmitButton > button:hover {
         color: #0e1117 !important;
         background-color: #00b8e6 !important;
         box-shadow: 0 0 15px #00d4ff !important;
     }
 
+    /* Korrektur für Eingabefelder */
     .stTextInput>div>div>input, .stSelectbox>div>div>div { background-color: #1a1c23 !important; color: #00d4ff !important; border: 1px solid #00d4ff !important; }
     [data-testid="stSidebar"] { background-color: #0e1117 !important; border-right: 1px solid #333; }
+    
     .legend-box, .rule-box, .info-card { background-color: #1a1c23; padding: 15px; border-radius: 8px; border-left: 5px solid #00d4ff; margin-bottom: 20px; }
     .badge { background-color: #00d4ff; color: #0e1117; padding: 2px 8px; border-radius: 10px; font-weight: bold; font-size: 0.8em; }
     .stTabs [data-baseweb="tab"] { color: #888 !important; }
@@ -58,11 +72,9 @@ def init_connection():
 
 conn = init_connection()
 
-# Session Status prüfen
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# Versuch, eine bestehende Session automatisch zu laden
 if st.session_state.user is None:
     try:
         session = conn.auth.get_session()
@@ -100,7 +112,6 @@ with st.sidebar:
     st.title("🎯 Menü")
     if st.session_state.user:
         st.write(f"Login: **{st.session_state.user.email}**")
-        # Logout Button im gleichen Design wie der Login
         if st.button("Abmelden"):
             conn.auth.sign_out()
             st.session_state.user = None
