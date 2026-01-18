@@ -10,13 +10,29 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# SEO Meta-Tags & Forced Dark Mode
+# SEO Meta-Tags & Forced Dark Mode (Optimiertes Button-CSS)
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
-    .stButton>button { background-color: #00d4ff !important; color: #0e1117 !important; font-weight: bold !important; width: 100%; border-radius: 5px; border: none; }
+    
+    /* Button Styling fixiert */
+    .stButton>button { 
+        background-color: #00d4ff !important; 
+        color: #0e1117 !important; 
+        font-weight: bold !important; 
+        width: 100%; 
+        border-radius: 5px; 
+        border: none;
+    }
+    
+    /* Fix für Button-Text Sichtbarkeit beim Hover/Active */
+    .stButton>button:hover, .stButton>button:active, .stButton>button:focus {
+        color: #0e1117 !important;
+        background-color: #00b8e6 !important;
+    }
+
     .stTextInput>div>div>input, .stSelectbox>div>div>div { background-color: #1a1c23 !important; color: #00d4ff !important; border: 1px solid #00d4ff !important; }
     [data-testid="stSidebar"] { background-color: #0e1117 !important; border-right: 1px solid #333; }
     .legend-box, .rule-box, .info-card { background-color: #1a1c23; padding: 15px; border-radius: 8px; border-left: 5px solid #00d4ff; margin-bottom: 20px; }
@@ -81,7 +97,8 @@ with st.sidebar:
     st.title("🎯 Menü")
     if st.session_state.user:
         st.write(f"Login: **{st.session_state.user.email}**")
-        if st.button("Abmelden"):
+        # Hier ist der Logout-Button mit expliziter Beschriftung
+        if st.button("Abmelden / Logout"):
             conn.auth.sign_out()
             st.session_state.user = None
             st.rerun()
@@ -97,7 +114,6 @@ with st.sidebar:
                             st.session_state.user = auth_res.user
                             st.rerun()
                     except Exception as e:
-                        # Prüfen ob wir eigentlich schon eingeloggt sind trotz Fehlermeldung
                         session_check = conn.auth.get_session()
                         if session_check:
                             st.session_state.user = session_check.user
