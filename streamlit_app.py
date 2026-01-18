@@ -60,8 +60,12 @@ st.markdown("""
 
 <div style="text-align: center;">
     <h1>🎯 CyberDarts Community Ranking</h1>
-    <p style="font-size: 1.1rem; color: #00d4ff;">Willkommen bei CyberDarts – hier findest du das aktuelle Leaderboard der Autodarts-Spieler basierend auf dem Elo-System.</p>
-    <p style="font-size: 0.9rem; opacity: 0.7; font-style: italic;">(Unabhängiges Fan-Projekt – steht in keiner geschäftlichen Verbindung zur Autodarts GmbH)</p>
+    <p style="font-size: 1.1rem; color: #00d4ff; font-weight: 500;">
+        Willkommen bei CyberDarts – hier findest du das unabhängige Leaderboard für Autodarts-Spieler basierend auf dem Elo-System.
+    </p>
+    <p style="font-size: 0.85rem; opacity: 0.7; font-style: italic;">
+        (Dieses Projekt steht in keiner geschäftlichen oder rechtlichen Verbindung zur Autodarts GmbH)
+    </p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -172,7 +176,7 @@ with t2:
                             st.session_state.booking_success = True; st.rerun()
                 elif st.session_state.booking_success:
                     st.success("✅ Match verbucht!"); 
-                    if st.button("Nächstes Match"): st.session_state.booking_success = False; st.rerun()
+                    if st.button("Nächstes Match melden"): st.session_state.booking_success = False; st.rerun()
 
 with t3:
     st.write("### 📅 Historie (Letzte 15)")
