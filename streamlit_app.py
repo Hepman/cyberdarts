@@ -62,8 +62,6 @@ st.markdown("""
         display: inline-block;
         margin-left: 10px;
     }
-
-    .info-card h4 { margin-top: 15px; margin-bottom: 5px; }
 </style>
 
 <div style="text-align: center;">
@@ -210,8 +208,8 @@ with t4:
 with t5:
     st.title("📖 Anleitung & System")
     
-    # DEIN NEUER TEXT ZUM ELO-SYSTEM
-    st.markdown(f"""
+    # Anleitungstext sauber formatiert ohne f-string Konflikte
+    st.markdown("""
     <div class="info-card">
         <h3>📊 Das Elo-Ranking System</h3>
         <p>Die Elo-Rangliste ist ein Bewertungssystem, das die relative Spielstärke von Spielern ausdrückt: 
@@ -239,11 +237,7 @@ with t5:
             <li><b>Gewinnt B (Überraschung!):</b> A verliert viele Punkte, B gewinnt viele Punkte.</li>
         </ul>
     </div>
-    """, unsafe_allow_html=True)
 
-    
-
-    st.markdown(f"""
     <div class="info-card">
         <h3>🎯 CyberDarts Spezial: Leg-Gewichtung</h3>
         <p>Um die Dominanz in einem Match zu belohnen, nutzt CyberDarts zusätzlich einen Multiplikator für das Leg-Ergebnis:</p>
