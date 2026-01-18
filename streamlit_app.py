@@ -10,7 +10,7 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# CSS für das Cyber-Design (Verschärftes Blau für Tabellenüberschriften)
+# CSS für das Cyber-Design (Inklusive blauer Tabellenköpfe und Zentrierung)
 st.markdown("""
 <style>
     /* Grund-Design */
@@ -19,22 +19,12 @@ st.markdown("""
     h1, h2, h3, h4 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
     /* Echte CSS-Overrides für Tabellen-Überschriften */
-    /* st.table Überschriften */
     [data-testid="stTable"] thead tr th {
         color: #00d4ff !important;
         font-weight: bold !important;
         border-bottom: 2px solid #00d4ff !important;
     }
     
-    /* st.dataframe Überschriften */
-    [data-testid="stDataFrame"] div[data-testid="stTable"] thead th,
-    [data-testid="stStaticTable"] thead th,
-    .stDataFrame thead th {
-        color: #00d4ff !important;
-        font-weight: bold !important;
-    }
-
-    /* Fix für die Interaktiven Dataframes Headers */
     [data-testid="stDataFrame"] [role="columnheader"] p {
         color: #00d4ff !important;
         font-weight: bold !important;
@@ -145,7 +135,17 @@ with t1:
         
         col_l, col_m, col_r = st.columns([1, 4, 1])
         with col_m:
-            st.dataframe(df_display, hide_index=True, use_container_width=True)
+            # Konfiguration der Spaltenbreite und Ausrichtung
+            st.dataframe(
+                df_display, 
+                hide_index=True, 
+                use_container_width=True,
+                column_config={
+                    "Rang": st.column_config.Column(width="small"),
+                    "Elo": st.column_config.NumberColumn(format="%d", help="Elo-Score"),
+                    "Trend": st.column_config.Column(width="medium")
+                }
+            )
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
