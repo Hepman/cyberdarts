@@ -10,45 +10,43 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# SEO Meta-Tags & Aggressives CSS für absolut identische Buttons
+# SEO Meta-Tags & Gezieltes CSS für identische Buttons
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    /* Radikaler Reset für ALLE Streamlit Buttons (Form & Normal) */
+    /* 1. Styling für den Login-Button (Form) und Logout-Button (Normal) vereinheitlichen */
     div.stButton > button, 
-    div.stFormSubmitButton > button,
-    button[kind="secondaryFormSubmit"],
-    button[kind="primaryFormSubmit"],
-    button[kind="secondary"],
-    button[kind="primary"] {
+    div.stFormSubmitButton > button {
         background-color: #00d4ff !important;
         color: #0e1117 !important;
         font-weight: bold !important;
         width: 100% !important;
         border-radius: 5px !important;
-        border: none !important;
-        height: 45px !important;
-        line-height: 45px !important;
-        padding: 0px !important;
-        display: inline-flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        transition: all 0.3s ease !important;
-        text-transform: none !important;
+        border: 1px solid #00d4ff !important;
+        /* Wir nutzen die Standard-Höhe von Streamlit Form-Buttons */
+        padding: 0.25rem 0.75rem !important;
+        min-height: 2.5rem !important;
+        transition: all 0.2s ease-in-out !important;
     }
     
-    /* Hover-Effekt für absolut alle Buttons */
+    /* 2. Hover-Effekt: Textfarbe beibehalten, Hintergrund leicht abdunkeln */
     div.stButton > button:hover, 
     div.stFormSubmitButton > button:hover {
-        color: #0e1117 !important;
+        border-color: #00d4ff !important;
         background-color: #00b8e6 !important;
-        box-shadow: 0 0 15px #00d4ff !important;
+        color: #0e1117 !important;
     }
 
-    /* Korrektur für Eingabefelder */
+    /* 3. Fokus-Effekt (verhindert das Verschwinden der Schrift beim Klicken) */
+    div.stButton > button:focus, 
+    div.stFormSubmitButton > button:focus {
+        color: #0e1117 !important;
+        box-shadow: 0 0 0 0.2rem rgba(0, 212, 255, 0.5) !important;
+    }
+
     .stTextInput>div>div>input, .stSelectbox>div>div>div { background-color: #1a1c23 !important; color: #00d4ff !important; border: 1px solid #00d4ff !important; }
     [data-testid="stSidebar"] { background-color: #0e1117 !important; border-right: 1px solid #333; }
     
@@ -112,6 +110,7 @@ with st.sidebar:
     st.title("🎯 Menü")
     if st.session_state.user:
         st.write(f"Login: **{st.session_state.user.email}**")
+        # Logout Button nutzt jetzt die gleichen CSS Klassen wie der Form-Button
         if st.button("Abmelden"):
             conn.auth.sign_out()
             st.session_state.user = None
