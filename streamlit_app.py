@@ -10,27 +10,42 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# CSS für das Cyber-Design (Inklusive blauer Tabellenköpfe und Zentrierung)
+# CSS für das Cyber-Design (Vollständige Kontrolle über die Tabellen-Optik)
 st.markdown("""
 <style>
-    /* Grund-Design */
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3, h4 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    /* Echte CSS-Overrides für Tabellen-Überschriften */
-    [data-testid="stTable"] thead tr th {
-        color: #00d4ff !important;
-        font-weight: bold !important;
-        border-bottom: 2px solid #00d4ff !important;
+    /* Custom Cyber Table Styling */
+    .cyber-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 25px 0;
+        font-size: 1.1em;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #1a1c23;
+        border: 1px solid #333;
+        border-radius: 8px;
+        overflow: hidden;
     }
-    
-    [data-testid="stDataFrame"] [role="columnheader"] p {
-        color: #00d4ff !important;
-        font-weight: bold !important;
+    .cyber-table thead tr {
+        background-color: #1a1c23;
+        color: #00d4ff;
+        text-align: left;
+        border-bottom: 2px solid #00d4ff;
     }
+    .cyber-table th, .cyber-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #333;
+    }
+    .cyber-table tbody tr:hover {
+        background-color: rgba(0, 212, 255, 0.05);
+    }
+    .text-center { text-align: center; }
+    .text-cyan { color: #00d4ff; font-weight: bold; }
 
-    /* ALLE BUTTONS ALS OUTLINE VERSION */
+    /* Button Styling */
     .stButton>button { 
         background-color: transparent !important; 
         color: #00d4ff !important; 
@@ -128,24 +143,23 @@ with t1:
     if players:
         st.write("🟢 Sieg | 🔴 Niederlage | ⚪ Offen")
         df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
-        df_players['Trend'] = df_players['username'].apply(lambda x: get_trend(x, m_df))
         
-        df_display = df_players[["username", "elo_score", "Trend"]].rename(columns={"username": "Spieler", "elo_score": "Elo"})
-        df_display.insert(0, "Rang", range(1, len(df_display) + 1))
+        # HTML Tabelle manuell zusammenbauen für perfektes Design
+        html_table = '<div style="max-width:800px; margin:auto;"><table class="cyber-table">'
+        html_table += '<thead><tr><th class="text-center">Rang</th><th>Spieler</th><th class="text-center">Elo</th><th>Trend</th></tr></thead><tbody>'
         
-        col_l, col_m, col_r = st.columns([1, 4, 1])
-        with col_m:
-            # Konfiguration der Spaltenbreite und Ausrichtung
-            st.dataframe(
-                df_display, 
-                hide_index=True, 
-                use_container_width=True,
-                column_config={
-                    "Rang": st.column_config.Column(width="small"),
-                    "Elo": st.column_config.NumberColumn(format="%d", help="Elo-Score"),
-                    "Trend": st.column_config.Column(width="medium")
-                }
-            )
+        for i, row in enumerate(df_players.itertuples(), 1):
+            trend = get_trend(row.username, m_df)
+            html_table += f'''
+            <tr>
+                <td class="text-center text-cyan">{i}</td>
+                <td>{row.username}</td>
+                <td class="text-center">{row.elo_score}</td>
+                <td style="letter-spacing: 2px;">{trend}</td>
+            </tr>
+            '''
+        html_table += '</tbody></table></div>'
+        st.markdown(html_table, unsafe_allow_html=True)
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
