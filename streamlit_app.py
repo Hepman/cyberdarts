@@ -10,21 +10,30 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# SEO Meta-Tags & CSS für das Cyber-Design
+# SEO Meta-Tags & CSS für das Cyber-Design mit OUTLINE BUTTONS
 st.markdown("""
 <style>
+    /* Grund-Design */
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    /* Button Styling */
+    /* ALLE BUTTONS ALS OUTLINE VERSION */
     .stButton>button { 
-        background-color: #00d4ff !important; 
-        color: #0e1117 !important; 
+        background-color: transparent !important; 
+        color: #00d4ff !important; 
         font-weight: bold !important; 
         width: 100%; 
         border-radius: 5px; 
-        border: none;
+        border: 2px solid #00d4ff !important;
+        transition: all 0.3s ease;
+    }
+
+    /* Hover-Effekt für die Buttons */
+    .stButton>button:hover { 
+        background-color: rgba(0, 212, 255, 0.1) !important;
+        box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        border-color: #00d4ff !important;
     }
 
     /* Input & Dropdown Styling */
@@ -72,16 +81,12 @@ if "user" not in st.session_state:
 
 # --- 3. HELPER FUNKTIONEN ---
 def calculate_elo_advanced(rating_w, rating_l, games_w, games_l, winner_legs, loser_legs):
-    """Berechnet Elo mit Margin of Victory (MoV) Gewichtung."""
     k = 32 if games_w < 30 else 16
     prob_w = 1 / (1 + 10 ** ((rating_l - rating_w) / 400))
-    
-    # MoV Faktor: 3:0 -> 1.2 | 3:1 -> 1.0 | 3:2 -> 0.8
     diff = winner_legs - loser_legs
     if diff >= 3: margin_factor = 1.2
     elif diff == 2: margin_factor = 1.0
     else: margin_factor = 0.8
-    
     gain = max(round(k * (1 - prob_w) * margin_factor), 5)
     return int(rating_w + gain), int(rating_l - gain), int(gain)
 
@@ -151,10 +156,9 @@ with t2:
         if "booking_success" not in st.session_state: 
             st.session_state.booking_success = False
         
-        # Zeile 1: Match Link
         url = st.text_input(
             "Autodarts Match Link", 
-            placeholder="https://play.autodarts.io/history/matches/xxxxx (Link aus der Zusammenfassung)"
+            placeholder="https://play.autodarts.io/history/matches/xxxxx"
         )
         
         if url:
@@ -165,21 +169,17 @@ with t2:
                     p_map = {p['username']: p for p in players}
                     sorted_names = sorted(p_map.keys())
                     
-                    # Zeile 2: Gewinner
                     winner_name = st.selectbox("Gewinner", options=sorted_names, index=None, placeholder="Wer hat gewonnen?")
                     
-                    # Zeile 3: Verlierer (Vorauswahl des eingeloggten Users)
                     current_user_name = st.session_state.user.user_metadata.get('username', '')
                     default_idx = sorted_names.index(current_user_name) if current_user_name in sorted_names else None
                     loser_name = st.selectbox("Verlierer", options=sorted_names, index=default_idx, placeholder="Wer hat verloren?")
                     
-                    # Zeile 4: Legs nebeneinander
                     col_l1, col_l2 = st.columns(2)
                     leg_options = [str(i) for i in range(22)]
                     w_legs_raw = col_l1.selectbox("Legs Gewinner", options=leg_options, index=None, placeholder="-")
                     l_legs_raw = col_l2.selectbox("Legs Verlierer", options=leg_options, index=None, placeholder="-")
                     
-                    # Zeile 5: Button
                     if st.button("Ergebnis jetzt buchen"):
                         if not winner_name or not loser_name or w_legs_raw is None or l_legs_raw is None:
                             st.error("Bitte fülle alle Felder aus!")
@@ -188,7 +188,6 @@ with t2:
                             if winner_name != loser_name and w_legs > l_legs:
                                 pw, pl = p_map[winner_name], p_map[loser_name]
                                 nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'], w_legs, l_legs)
-                                
                                 conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
                                 conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                                 conn.table("matches").insert({
@@ -196,13 +195,11 @@ with t2:
                                     "elo_diff": d, "url": url, "winner_legs": w_legs, "loser_legs": l_legs
                                 }).execute()
                                 st.session_state.booking_success = True; st.rerun()
-                            else: st.error("Prüfe die Angaben (Gewinner != Verlierer & Legs korrekt)")
-                
+                            else: st.error("Prüfe die Angaben.")
                 elif st.session_state.booking_success:
                     st.success("✅ Match erfolgreich verbucht!"); 
                     if st.button("Nächstes Match melden"): 
                         st.session_state.booking_success = False; st.rerun()
-            else: st.error("Ungültiger Autodarts-Link.")
 
 with t3:
     st.write("### 📅 Historie (Letzte 15)")
@@ -227,12 +224,6 @@ with t5:
     st.markdown("""
     <div class="info-card">
         <h3>🎯 Das CyberDarts Elo-System</h3>
-        <p>Wir nutzen ein dynamisches Elo-System mit <b>Margin of Victory</b> Gewichtung:</p>
-        <ul>
-            <li><b>3:0 Sieg:</b> 120% Elo-Gewinn (Dominanz-Bonus)</li>
-            <li><b>3:1 Sieg:</b> 100% Elo-Gewinn (Standard)</li>
-            <li><b>3:2 Sieg:</b> 80% Elo-Gewinn (Knapper Sieg)</li>
-        </ul>
-        <p>So belohnen wir konstante Leistung in jedem einzelnen Leg!</p>
+        <p>Dominante Siege (3:0) werden stärker gewichtet als knappe Spiele (3:2).</p>
     </div>
     """, unsafe_allow_html=True)
