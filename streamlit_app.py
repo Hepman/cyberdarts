@@ -10,7 +10,7 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# CSS für das Cyber-Design (Inklusive blauer Tabellenköpfe)
+# CSS für das Cyber-Design (Verschärftes Blau für Tabellenüberschriften)
 st.markdown("""
 <style>
     /* Grund-Design */
@@ -18,15 +18,26 @@ st.markdown("""
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3, h4 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    /* Tabellenköpfe (Headers) anpassen */
-    thead tr th {
+    /* Echte CSS-Overrides für Tabellen-Überschriften */
+    /* st.table Überschriften */
+    [data-testid="stTable"] thead tr th {
         color: #00d4ff !important;
-        background-color: #1a1c23 !important;
+        font-weight: bold !important;
+        border-bottom: 2px solid #00d4ff !important;
     }
     
-    /* Dataframe Header spezifisch für Streamlit */
-    [data-testid="stTable"] thead th, [data-testid="stDataFrame"] th {
+    /* st.dataframe Überschriften */
+    [data-testid="stDataFrame"] div[data-testid="stTable"] thead th,
+    [data-testid="stStaticTable"] thead th,
+    .stDataFrame thead th {
         color: #00d4ff !important;
+        font-weight: bold !important;
+    }
+
+    /* Fix für die Interaktiven Dataframes Headers */
+    [data-testid="stDataFrame"] [role="columnheader"] p {
+        color: #00d4ff !important;
+        font-weight: bold !important;
     }
 
     /* ALLE BUTTONS ALS OUTLINE VERSION */
@@ -161,7 +172,7 @@ with t2:
                             wl, ll = int(wl_r), int(ll_r)
                             if w_n != l_n and wl > ll:
                                 pw, pl = p_map[w_n], p_map[l_n]
-                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pw['games_played'], wl, ll)
+                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'], wl, ll)
                                 conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
                                 conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                                 conn.table("matches").insert({"id": mid, "winner_name": w_n, "loser_name": l_n, "elo_diff": d, "url": url, "winner_legs": wl, "loser_legs": ll}).execute()
