@@ -39,8 +39,18 @@ def init_connection():
 
 conn = init_connection()
 
+# Session Status prüfen
 if "user" not in st.session_state:
     st.session_state.user = None
+
+# Versuch, eine bestehende Session automatisch zu laden
+if st.session_state.user is None:
+    try:
+        session = conn.auth.get_session()
+        if session:
+            st.session_state.user = session.user
+    except:
+        pass
 
 # --- 3. HELPER FUNKTIONEN ---
 def calculate_elo_advanced(rating_w, rating_l, games_w, games_l, winner_legs, loser_legs):
@@ -80,12 +90,22 @@ with st.sidebar:
             le = st.text_input("E-Mail").strip().lower()
             lp = st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
-                try:
-                    auth_res = conn.auth.sign_in_with_password({"email": le, "password": lp})
-                    if auth_res.user:
-                        st.session_state.user = auth_res.user
-                        st.rerun()
-                except: st.error("Login fehlgeschlagen.")
+                if le and lp:
+                    try:
+                        auth_res = conn.auth.sign_in_with_password({"email": le, "password": lp})
+                        if auth_res.user:
+                            st.session_state.user = auth_res.user
+                            st.rerun()
+                    except Exception as e:
+                        # Prüfen ob wir eigentlich schon eingeloggt sind trotz Fehlermeldung
+                        session_check = conn.auth.get_session()
+                        if session_check:
+                            st.session_state.user = session_check.user
+                            st.rerun()
+                        else:
+                            st.error("Login fehlgeschlagen. Bitte Daten prüfen.")
+                else:
+                    st.warning("Bitte E-Mail und Passwort eingeben.")
 
     st.markdown("---")
     with st.expander("⚖️ Impressum & Rechtliches"):
