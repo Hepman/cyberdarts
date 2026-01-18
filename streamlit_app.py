@@ -10,7 +10,7 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# SEO Meta-Tags & Forced Dark Mode (Dein CSS bleibt erhalten)
+# SEO Meta-Tags & Forced Dark Mode
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
@@ -21,6 +21,8 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #0e1117 !important; border-right: 1px solid #333; }
     .legend-box, .rule-box, .info-card { background-color: #1a1c23; padding: 15px; border-radius: 8px; border-left: 5px solid #00d4ff; margin-bottom: 20px; }
     .badge { background-color: #00d4ff; color: #0e1117; padding: 2px 8px; border-radius: 10px; font-weight: bold; font-size: 0.8em; }
+    .stTabs [data-baseweb="tab"] { color: #888 !important; }
+    .stTabs [aria-selected="true"] { color: #00d4ff !important; border-bottom-color: #00d4ff !important; }
 </style>
 <div style="text-align: center;">
     <h1>🎯 CyberDarts Community Ranking</h1>
@@ -40,7 +42,7 @@ conn = init_connection()
 if "user" not in st.session_state:
     st.session_state.user = None
 
-# --- 3. HELPER FUNKTIONEN (ELO MIT MOV) ---
+# --- 3. HELPER FUNKTIONEN ---
 def calculate_elo_advanced(rating_w, rating_l, games_w, games_l, winner_legs, loser_legs):
     # K-Faktor Logik
     k = 32 if games_w < 30 else 16
@@ -70,7 +72,7 @@ players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 m_df = pd.DataFrame(matches_data) if matches_data else pd.DataFrame(columns=['id', 'winner_name', 'loser_name', 'elo_diff', 'url', 'created_at', 'winner_legs', 'loser_legs'])
 
-# --- 5. SIDEBAR (Login bleibt gleich) ---
+# --- 5. SIDEBAR MIT IMPRESSUM ---
 with st.sidebar:
     st.title("🎯 Menü")
     if st.session_state.user:
@@ -89,8 +91,18 @@ with st.sidebar:
                     st.session_state.user = res.user
                     st.rerun()
                 except: st.error("Login fehlgeschlagen.")
+
     st.markdown("---")
-    st.caption("**Sascha Heptner** | sascha@cyberdarts.de")
+    with st.expander("⚖️ Impressum & Rechtliches"):
+        st.caption(f"""
+        **Verantwortlich:** Sascha Heptner  
+        Römerstr. 1  
+        79725 Laufenburg  
+        sascha@cyberdarts.de  
+
+        CyberDarts © 2026  
+        *Unabhängiges Community-Projekt*
+        """)
 
 # --- 6. TABS ---
 t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung", "📖 Anleitung"])
@@ -137,7 +149,7 @@ with t2:
                             conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                             conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": d, "url": url, "winner_legs": w_legs, "loser_legs": l_legs}).execute()
                             st.session_state.booking_success = True; st.rerun()
-                        else: st.error("Prüfe die Angaben (Gewinner != Verlierer & Legs korrekt)")
+                        else: st.error("Bitte Eingaben prüfen.")
                 elif st.session_state.booking_success:
                     st.success("✅ Match verbucht!"); 
                     if st.button("Nächstes Match melden"): st.session_state.booking_success = False; st.rerun()
@@ -150,7 +162,7 @@ with t3:
             st.markdown(f"**{m['winner_name']}** {leg_info} vs {m['loser_name']} <span class='badge'>+{m['elo_diff']} Elo</span>", unsafe_allow_html=True)
             st.divider()
 
-with t4: # Registrierung bleibt gleich
+with t4:
     if not st.session_state.user:
         with st.form("reg"):
             re, rp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
@@ -161,5 +173,5 @@ with t4: # Registrierung bleibt gleich
                     st.success("Erfolg! Bitte einloggen.")
                 except Exception as e: st.error(f"Fehler: {e}")
 
-with t5: # Anleitung bleibt gleich
+with t5:
     st.markdown('<div class="info-card"><h3>🎯 System-Info</h3>Dieses Ranking nutzt ein gewichtetes Elo-System. Deutliche Siege (3:0) bringen mehr Punkte als knappe (3:2).</div>', unsafe_allow_html=True)
