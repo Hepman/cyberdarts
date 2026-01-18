@@ -10,7 +10,7 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# SEO Meta-Tags & CSS für das Cyber-Design mit OUTLINE BUTTONS
+# SEO Meta-Tags & CSS für das Cyber-Design
 st.markdown("""
 <style>
     /* Grund-Design */
@@ -29,11 +29,9 @@ st.markdown("""
         transition: all 0.3s ease;
     }
 
-    /* Hover-Effekt für die Buttons */
     .stButton>button:hover { 
         background-color: rgba(0, 212, 255, 0.1) !important;
         box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
-        border-color: #00d4ff !important;
     }
 
     /* Input & Dropdown Styling */
@@ -53,9 +51,16 @@ st.markdown("""
         border-left: 5px solid #00d4ff; margin-bottom: 20px;
     }
     
-    .badge {
-        background-color: #00d4ff; color: #0e1117; padding: 2px 8px; 
-        border-radius: 10px; font-weight: bold; font-size: 0.8em;
+    /* OUTLINE BADGE FÜR ELO-DIFF IN DER HISTORIE */
+    .badge-outline {
+        color: #00d4ff; 
+        padding: 2px 10px; 
+        border-radius: 12px; 
+        border: 1px solid #00d4ff;
+        font-weight: bold; 
+        font-size: 0.9em;
+        display: inline-block;
+        margin-left: 10px;
     }
 </style>
 
@@ -206,7 +211,8 @@ with t3:
     if not m_df.empty:
         for m in matches_data[::-1][:15]:
             score = f"({m.get('winner_legs', 3)}:{m.get('loser_legs', 0)})"
-            st.markdown(f"**{m['winner_name']}** {score} vs {m['loser_name']} <span class='badge'>+{m['elo_diff']} Elo</span>", unsafe_allow_html=True)
+            # HIER DIE ÄNDERUNG: Nutze badge-outline Klasse
+            st.markdown(f"**{m['winner_name']}** {score} vs {m['loser_name']} <span class='badge-outline'>+{m['elo_diff']} Elo</span>", unsafe_allow_html=True)
             st.divider()
 
 with t4:
