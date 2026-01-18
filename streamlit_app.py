@@ -10,6 +10,7 @@ st.set_page_config(
     page_icon="🎯"
 )
 
+# SEO Meta-Tags & Forced Dark Mode
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
@@ -20,6 +21,8 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #0e1117 !important; border-right: 1px solid #333; }
     .legend-box, .rule-box, .info-card { background-color: #1a1c23; padding: 15px; border-radius: 8px; border-left: 5px solid #00d4ff; margin-bottom: 20px; }
     .badge { background-color: #00d4ff; color: #0e1117; padding: 2px 8px; border-radius: 10px; font-weight: bold; font-size: 0.8em; }
+    .stTabs [data-baseweb="tab"] { color: #888 !important; }
+    .stTabs [aria-selected="true"] { color: #00d4ff !important; border-bottom-color: #00d4ff !important; }
 </style>
 <div style="text-align: center;">
     <h1>🎯 CyberDarts Community Ranking</h1>
@@ -36,7 +39,6 @@ def init_connection():
 
 conn = init_connection()
 
-# Initialisiere Session State für User
 if "user" not in st.session_state:
     st.session_state.user = None
 
@@ -64,10 +66,9 @@ players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
 m_df = pd.DataFrame(matches_data) if matches_data else pd.DataFrame(columns=['id', 'winner_name', 'loser_name', 'elo_diff', 'url', 'created_at', 'winner_legs', 'loser_legs'])
 
-# --- 5. SIDEBAR MIT KORRIGIERTEM LOGIN ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("🎯 Menü")
-    
     if st.session_state.user:
         st.write(f"Login: **{st.session_state.user.email}**")
         if st.button("Abmelden"):
@@ -80,14 +81,11 @@ with st.sidebar:
             lp = st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
                 try:
-                    # Direkter Zugriff auf den Auth-Client der Connection
                     auth_res = conn.auth.sign_in_with_password({"email": le, "password": lp})
                     if auth_res.user:
                         st.session_state.user = auth_res.user
-                        st.success("Erfolgreich eingeloggt!")
                         st.rerun()
-                except Exception as e:
-                    st.error(f"Login Fehler: Passwort oder E-Mail falsch.")
+                except: st.error("Login fehlgeschlagen.")
 
     st.markdown("---")
     with st.expander("⚖️ Impressum & Rechtliches"):
@@ -96,8 +94,8 @@ with st.sidebar:
         Römerstr. 1  
         79725 Laufenburg  
         sascha@cyberdarts.de  
-
-        CyberDarts © 2026  
+        
+        CyberDarts © 2026
         """)
 
 # --- 6. TABS ---
@@ -120,15 +118,14 @@ with t1:
         st.markdown('<div class="rule-box"><h3>📜 Kurzregeln</h3>501 SI/DO | Bo5<br>Bull-Out startet Match<br>KI-Referee Pflicht</div>', unsafe_allow_html=True)
 
 with t2:
-    if not st.session_state.user: 
-        st.warning("Bitte erst einloggen.")
+    if not st.session_state.user: st.warning("Bitte erst einloggen.")
     else:
         if "booking_success" not in st.session_state: st.session_state.booking_success = False
         url = st.text_input("AutoDarts Match Link")
         if url:
-            m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
+            m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_match:
-                mid = m_id_match.group(0)
+                mid = m_id_match.group(1)
                 if not any(m['id'] == mid for m in matches_data) and not st.session_state.booking_success:
                     p_map = {p['username']: p for p in players}
                     w = st.selectbox("Gewinner", sorted(p_map.keys()))
@@ -146,7 +143,7 @@ with t2:
                             conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                             conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": d, "url": url, "winner_legs": w_legs, "loser_legs": l_legs}).execute()
                             st.session_state.booking_success = True; st.rerun()
-                        else: st.error("Bitte Eingaben prüfen.")
+                        else: st.error("Prüfe die Angaben.")
                 elif st.session_state.booking_success:
                     st.success("✅ Match verbucht!"); 
                     if st.button("Nächstes Match melden"): st.session_state.booking_success = False; st.rerun()
@@ -168,7 +165,7 @@ with t4:
                 try:
                     conn.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
                     st.success("Erfolg! Bitte einloggen.")
-                except Exception as e: st.error(f"Fehler bei Registrierung.")
+                except Exception as e: st.error(f"Fehler: {e}")
 
 with t5:
     st.markdown('<div class="info-card"><h3>🎯 System-Info</h3>Dieses Ranking nutzt ein gewichtetes Elo-System. Deutliche Siege (3:0) bringen mehr Punkte als knappe (3:2).</div>', unsafe_allow_html=True)
