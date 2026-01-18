@@ -63,6 +63,15 @@ def calculate_elo_advanced(rating_w, rating_l, games_w, games_l, winner_legs, lo
     gain = max(round(k * (1 - prob_w) * margin_factor), 5)
     return int(rating_w + gain), int(rating_l - gain), int(gain)
 
+def get_trend(username, match_df):
+    if match_df.empty or 'winner_name' not in match_df.columns: 
+        return "⚪" * 10
+    u_m = match_df[(match_df['winner_name'] == username) | (match_df['loser_name'] == username)]
+    # Die letzten 10 Spiele des Users nehmen
+    icons = ["🟢" if m['winner_name'] == username else "🔴" for _, m in u_m.tail(10).iloc[::-1].iterrows()]
+    res = "".join(icons)
+    return res.ljust(10, "⚪")[:10]
+
 # --- 4. DATEN LADEN ---
 players = conn.table("profiles").select("*").execute().data or []
 matches_data = conn.table("matches").select("*").order("created_at", desc=False).execute().data or []
@@ -103,12 +112,17 @@ t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 His
 
 with t1:
     if players:
+        st.write("🟢 Sieg | 🔴 Niederlage | ⚪ Offen")
         df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
-        df_display = df_players[["username", "elo_score"]].rename(columns={"username": "Spieler", "elo_score": "Elo"})
+        
+        # Trend für jeden Spieler berechnen
+        df_players['Trend'] = df_players['username'].apply(lambda x: get_trend(x, m_df))
+        
+        df_display = df_players[["username", "elo_score", "Trend"]].rename(columns={"username": "Spieler", "elo_score": "Elo"})
         df_display.insert(0, "Rang", range(1, len(df_display) + 1))
         
         st.write("### Aktuelle Top-Spieler")
-        col_l, col_m, col_r = st.columns([1, 2, 1])
+        col_l, col_m, col_r = st.columns([1, 4, 1])
         with col_m:
             st.dataframe(df_display, hide_index=True, use_container_width=True)
 
