@@ -10,19 +10,13 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# CSS für das Cyber-Design (Nur notwendige Styles für Outline-Look und Farben)
+# CSS für das Cyber-Design
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3, h4 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    /* Tabellenüberschriften in Hellblau */
-    [data-testid="stTable"] thead tr th, [data-testid="stDataFrame"] th, [role="columnheader"] p {
-        color: #00d4ff !important;
-        font-weight: bold !important;
-    }
-
     /* Outline Buttons */
     .stButton>button { 
         background-color: transparent !important; 
@@ -122,23 +116,16 @@ with t1:
     if players:
         st.write("🟢 Sieg | 🔴 Niederlage | ⚪ Offen")
         df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
-        df_players['Trend'] = df_players['username'].apply(lambda x: get_trend(x, m_df))
         
-        df_display = df_players[["username", "elo_score", "Trend"]].rename(columns={"username": "Spieler", "elo_score": "Elo"})
-        df_display.insert(0, "Rang", range(1, len(df_display) + 1))
-        
-        col_l, col_m, col_r = st.columns([1, 4, 1])
+        # Zentrierung durch Spalten
+        col_l, col_m, col_r = st.columns([1, 2, 1])
         with col_m:
-            st.dataframe(
-                df_display, 
-                hide_index=True, 
-                use_container_width=True,
-                column_config={
-                    "Rang": st.column_config.Column(width="small"),
-                    "Elo": st.column_config.NumberColumn(format="%d", help="Elo-Score"),
-                    "Trend": st.column_config.Column(width="medium")
-                }
-            )
+            # Manuelle Markdown-Tabelle für perfekte Kontrolle
+            md_table = "| Rang | Spieler | Elo | Trend |\n| :---: | :--- | :---: | :--- |\n"
+            for i, row in enumerate(df_players.itertuples(), 1):
+                trend = get_trend(row.username, m_df)
+                md_table += f"| {i} | {row.username} | **{row.elo_score}** | {trend} |\n"
+            st.markdown(md_table)
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
@@ -165,7 +152,7 @@ with t2:
                             wl, ll = int(wl_r), int(ll_r)
                             if w_n != l_n and wl > ll:
                                 pw, pl = p_map[w_n], p_map[l_n]
-                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'], wl, ll)
+                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pw['games_played'], wl, ll)
                                 conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
                                 conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                                 conn.table("matches").insert({"id": mid, "winner_name": w_n, "loser_name": l_n, "elo_diff": d, "url": url, "winner_legs": wl, "loser_legs": ll}).execute()
@@ -195,15 +182,15 @@ with t4:
 with t5:
     st.header("📖 Anleitung & System")
     st.write("Die Elo-Rangliste ist ein Bewertungssystem, das die relative Spielstärke von Spielern in einem Spiel (wie Schach oder Tischtennis) durch eine Zahl (die Elo-Zahl) ausdrückt: Höhere Zahl = stärkerer Spieler. Nach jedem Spiel werden Punkte zwischen den Spielern umverteilt, basierend auf dem Ergebnis im Vergleich zur erwarteten Punktzahl (die sich aus der Differenz der Elo-Zahlen ergibt) – wer mehr gewinnt als erwartet, gewinnt Elo-Punkte, wer weniger gewinnt, verliert.")
-    st.write("**Das Grundprinzip:**")
-    st.write("* **Bewertung:** Jeder Spieler hat eine Zahl, die seine Spielstärke repräsentiert (z. B. Anfänger < 1000, überdurchschnittlich 1400-1599).")
-    st.write("* **Erwartungswert:** Aus der Differenz der Elo-Zahlen zweier Spieler wird berechnet, wie viele Punkte der eine gegen den anderen voraussichtlich holen wird (z. B. 12 Elo-Punkte Differenz = 1 Prozentpunkt Unterschied in der Gewinnerwartung).")
-    st.write("**Anpassung:**")
+    st.subheader("Das Grundprinzip:")
+    st.write("**Bewertung:** Jeder Spieler hat eine Zahl, die seine Spielstärke repräsentiert (z. B. Anfänger < 1000, überdurchschnittlich 1400-1599).")
+    st.write("**Erwartungswert:** Aus der Differenz der Elo-Zahlen zweier Spieler wird berechnet, wie viele Punkte der eine gegen den anderen voraussichtlich holen wird (z. B. 12 Elo-Punkte Differenz = 1 Prozentpunkt Unterschied in der Gewinnerwartung).")
+    st.subheader("Anpassung:")
     st.write("* **Gewinnt ein Spieler mehr als erwartet:** Seine Elo-Zahl steigt, da er besser als gedacht war.")
     st.write("* **Gewinnt ein Spieler weniger als erwartet:** Seine Elo-Zahl sinkt.")
     st.write("* **Punktetransfer:** Die Punkte werden typischerweise zwischen den Spielern umverteilt. Der Verlierer gibt Punkte an den Gewinner ab.")
     st.write("* **Anwendung:** Das System wird in vielen Spielen genutzt, um die Spielstärke zu vergleichen und faire Matches zu ermöglichen, da es die Spielstärke objektiv abbildet.")
-    st.write("**Einfaches Beispiel:**")
+    st.subheader("Einfaches Beispiel:")
     st.write("Spieler A (1600 Elo) spielt gegen Spieler B (1400 Elo).")
     st.write("Erwartung: Spieler A wird voraussichtlich mehr Punkte erzielen.")
     st.write("* **Gewinnt A:** Seine Zahl steigt leicht, B verliert leicht.")
