@@ -10,15 +10,13 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# SEO Meta-Tags & CSS für das Cyber-Design
+# CSS für das Cyber-Design (Nur für die App-Optik, nicht im Text-Bereich)
 st.markdown("""
 <style>
-    /* Grund-Design */
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3, h4 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    /* ALLE BUTTONS ALS OUTLINE VERSION */
     .stButton>button { 
         background-color: transparent !important; 
         color: #00d4ff !important; 
@@ -26,15 +24,12 @@ st.markdown("""
         width: 100%; 
         border-radius: 5px; 
         border: 2px solid #00d4ff !important;
-        transition: all 0.3s ease;
     }
 
     .stButton>button:hover { 
         background-color: rgba(0, 212, 255, 0.1) !important;
-        box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
     }
 
-    /* Input & Dropdown Styling */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #1a1c23 !important;
         color: #00d4ff !important;
@@ -45,32 +40,11 @@ st.markdown("""
         background-color: #0e1117 !important;
         border-right: 1px solid #333;
     }
-
-    .legend-box, .rule-box, .info-card {
-        background-color: #1a1c23; padding: 15px; border-radius: 8px; 
-        border-left: 5px solid #00d4ff; margin-bottom: 20px;
-    }
-    
-    /* OUTLINE BADGE FÜR ELO-DIFF */
-    .badge-outline {
-        color: #00d4ff; 
-        padding: 2px 10px; 
-        border-radius: 12px; 
-        border: 1px solid #00d4ff;
-        font-weight: bold; 
-        font-size: 0.9em;
-        display: inline-block;
-        margin-left: 10px;
-    }
 </style>
-
-<div style="text-align: center;">
-    <h1>🎯 CyberDarts Community Ranking</h1>
-    <p style="font-size: 1.1rem; color: #00d4ff; font-weight: 500;">
-        Unabhängiges Leaderboard für Autodarts-Spieler
-    </p>
-</div>
 """, unsafe_allow_html=True)
+
+st.title("🎯 CyberDarts Community Ranking")
+st.write("Unabhängiges Leaderboard für Autodarts-Spieler")
 
 # --- 2. DATENBANK-VERBINDUNG ---
 @st.cache_resource
@@ -128,26 +102,17 @@ with st.sidebar:
                     st.rerun()
                 except: st.error("Login fehlgeschlagen.")
     st.markdown("---")
-    st.caption("**Sascha Heptner** | CyberDarts © 2026")
+    st.caption("CyberDarts © 2026")
 
 # --- 6. TABS ---
 t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung", "📖 Anleitung"])
 
 with t1:
-    col_main, col_rules = st.columns([2, 1])
-    with col_main:
-        if players:
-            st.markdown('<div class="legend-box">🟢 Sieg | 🔴 Niederlage | ⚪ Offen</div>', unsafe_allow_html=True)
-            df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
-            html = '<table style="width:100%; color:#00d4ff; border-collapse: collapse;">'
-            html += '<tr style="border-bottom:2px solid #00d4ff; text-align:left;"><th>Rang</th><th>Spieler</th><th>Elo</th><th>Trend</th></tr>'
-            for i, r in enumerate(df_players.itertuples(), 1):
-                icon = "🥇" if i==1 else "🥈" if i==2 else "🥉" if i==3 else f"{i}."
-                trend = get_trend(r.username, m_df)
-                html += f'<tr style="border-bottom:1px solid #1a1c23;"><td>{icon}</td><td>{r.username}</td><td>{r.elo_score}</td><td style="letter-spacing:2px;">{trend}</td></tr>'
-            st.markdown(html + '</table>', unsafe_allow_html=True)
-    with col_rules:
-        st.markdown('<div class="rule-box"><h3>📜 Kurzregeln</h3>• 501 SI/DO | Bo5 Legs<br>• Bull-Out startet Match<br>• Meldung durch Gewinner</div>', unsafe_allow_html=True)
+    if players:
+        st.write("🟢 Sieg | 🔴 Niederlage | ⚪ Offen")
+        df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
+        # Tabellarische Darstellung über Dataframe für Stabilität ohne HTML
+        st.table(df_players[["username", "elo_score"]].rename(columns={"username": "Spieler", "elo_score": "Elo-Punkte"}))
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
@@ -181,9 +146,8 @@ with t2:
                                 conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                                 conn.table("matches").insert({"id": mid, "winner_name": winner_name, "loser_name": loser_name, "elo_diff": d, "url": url, "winner_legs": w_legs, "loser_legs": l_legs}).execute()
                                 st.session_state.booking_success = True; st.rerun()
-                            else: st.error("Eingaben prüfen.")
                 elif st.session_state.booking_success:
-                    st.success("✅ Match verbucht!"); 
+                    st.success("✅ Match verbucht!")
                     if st.button("Nächstes Match melden"): st.session_state.booking_success = False; st.rerun()
 
 with t3:
@@ -191,7 +155,7 @@ with t3:
     if not m_df.empty:
         for m in matches_data[::-1][:15]:
             score = f"({m.get('winner_legs', 3)}:{m.get('loser_legs', 0)})"
-            st.markdown(f"**{m['winner_name']}** {score} vs {m['loser_name']} <span class='badge-outline'>+{m['elo_diff']} Elo</span>", unsafe_allow_html=True)
+            st.write(f"**{m['winner_name']}** {score} vs {m['loser_name']} | **+{m['elo_diff']} Elo**")
             st.divider()
 
 with t4:
@@ -206,45 +170,34 @@ with t4:
                 except Exception as e: st.error(f"Fehler: {e}")
 
 with t5:
-    st.title("📖 Anleitung & System")
+    st.header("📖 Anleitung & System")
     
-    # Anleitungstext sauber formatiert ohne f-string Konflikte
-    st.markdown("""
-    <div class="info-card">
-        <h3>📊 Das Elo-Ranking System</h3>
-        <p>Die Elo-Rangliste ist ein Bewertungssystem, das die relative Spielstärke von Spielern ausdrückt: 
-        <b>Höhere Zahl = stärkerer Spieler.</b> Nach jedem Spiel werden Punkte zwischen den Spielern umverteilt, 
-        basierend auf dem Ergebnis im Vergleich zur erwarteten Punktzahl.</p>
-        
-        <h4>Das Grundprinzip:</h4>
-        <ul>
-            <li><b>Bewertung:</b> Jeder Spieler hat eine Zahl (z. B. Anfänger < 1000, überdurchschnittlich 1400-1599).</li>
-            <li><b>Erwartungswert:</b> Aus der Differenz der Elo-Zahlen zweier Spieler wird berechnet, wie viele Punkte der eine gegen den anderen voraussichtlich holen wird.</li>
-        </ul>
+    st.subheader("📊 Das Elo-Ranking System")
+    st.write("""
+    Die Elo-Rangliste ist ein Bewertungssystem, das die relative Spielstärke von Spielern in einem Spiel (wie Schach oder Tischtennis) durch eine Zahl (die Elo-Zahl) ausdrückt: 
+    **Höhere Zahl = stärkerer Spieler.** Nach jedem Spiel werden Punkte zwischen den Spielern umverteilt, basierend auf dem Ergebnis im Vergleich zur erwarteten Punktzahl (die sich aus der Differenz der Elo-Zahlen ergibt) – wer mehr gewinnt als erwartet, gewinnt Elo-Punkte, wer weniger gewinnt, verliert.
+    """)
 
-        <h4>Anpassung:</h4>
-        <ul>
-            <li><b>Gewinnt ein Spieler mehr als erwartet:</b> Seine Elo-Zahl steigt, da er besser als gedacht war.</li>
-            <li><b>Gewinnt ein Spieler weniger als erwartet:</b> Seine Elo-Zahl sinkt.</li>
-            <li><b>Punktetransfer:</b> Die Punkte werden typischerweise zwischen den Spielern umverteilt. Der Verlierer gibt Punkte an den Gewinner ab.</li>
-        </ul>
+    st.write("**Das Grundprinzip:**")
+    st.write("* **Bewertung:** Jeder Spieler hat eine Zahl, die seine Spielstärke repräsentiert (z. B. Anfänger < 1000, überdurchschnittlich 1400-1599).")
+    st.write("* **Erwartungswert:** Aus der Differenz der Elo-Zahlen zweier Spieler wird berechnet, wie viele Punkte der eine gegen den anderen voraussichtlich holen wird (z. B. 12 Elo-Punkte Differenz = 1 Prozentpunkt Unterschied in der Gewinnerwartung).")
 
-        <h4>Einfaches Beispiel:</h4>
-        <p>Spieler A (1600 Elo) spielt gegen Spieler B (1400 Elo).<br>
-        <i>Erwartung:</i> Spieler A wird voraussichtlich gewinnen.</p>
-        <ul>
-            <li><b>Gewinnt A:</b> Seine Zahl steigt leicht, B verliert leicht.</li>
-            <li><b>Gewinnt B (Überraschung!):</b> A verliert viele Punkte, B gewinnt viele Punkte.</li>
-        </ul>
-    </div>
+    st.write("**Anpassung:**")
+    st.write("* **Gewinnt ein Spieler mehr als erwartet:** Seine Elo-Zahl steigt, da er besser als gedacht war.")
+    st.write("* **Gewinnt ein Spieler weniger als erwartet:** Seine Elo-Zahl sinkt.")
+    st.write("* **Punktetransfer:** Die Punkte werden typischerweise zwischen den Spielern umverteilt. Der Verlierer gibt Punkte an den Gewinner ab.")
+    st.write("* **Anwendung:** Das System wird in vielen Spielen genutzt, um die Spielstärke zu vergleichen und faire Matches zu ermöglichen, da es die Spielstärke objektiv abbildet.")
 
-    <div class="info-card">
-        <h3>🎯 CyberDarts Spezial: Leg-Gewichtung</h3>
-        <p>Um die Dominanz in einem Match zu belohnen, nutzt CyberDarts zusätzlich einen Multiplikator für das Leg-Ergebnis:</p>
-        <ul>
-            <li><b>3:0 Sieg:</b> 120% Elo-Gewinn (Dominanz-Bonus)</li>
-            <li><b>3:1 Sieg:</b> 100% Elo-Gewinn (Standard)</li>
-            <li><b>3:2 Sieg:</b> 80% Elo-Gewinn (Knapper Sieg)</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    st.write("**Einfaches Beispiel:**")
+    st.write("Spieler A (1600 Elo) spielt gegen Spieler B (1400 Elo).")
+    st.write("Erwartung: Spieler A wird voraussichtlich mehr Punkte erzielen.")
+    st.write("* **Gewinnt A:** Seine Zahl steigt leicht, B verliert leicht.")
+    st.write("* **Gewinnt B (Überraschung!):** A verliert viele Punkte, B gewinnt viele Punkte.")
+
+    st.divider()
+
+    st.subheader("🎯 CyberDarts Spezial: Leg-Gewichtung")
+    st.write("Um die Dominanz in einem Match zu belohnen, nutzt CyberDarts zusätzlich einen Multiplikator für das Leg-Ergebnis:")
+    st.write("* **3:0 Sieg:** 120% Elo-Gewinn (Dominanz-Bonus)")
+    st.write("* **3:1 Sieg:** 100% Elo-Gewinn (Standard)")
+    st.write("* **3:2 Sieg:** 80% Elo-Gewinn (Knapper Sieg)")
