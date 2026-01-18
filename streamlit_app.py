@@ -10,34 +10,34 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# SEO Meta-Tags & CSS für identisches Design basierend auf dem Login-Button
+# SEO Meta-Tags & Gezieltes CSS für den Logout-Button (Outline Design)
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    /* Wir stylen nur den Logout-Button so, dass er wie der Login-Form-Button aussieht */
+    /* Logout-Button: Transparent mit Rahmen (Outline) */
     div.stButton > button {
-        background-color: #00d4ff !important;
-        color: #0e1117 !important;
+        background-color: transparent !important;
+        color: #00d4ff !important;
         font-weight: bold !important;
         width: 100% !important;
         border-radius: 8px !important;
-        border: 1px solid #00d4ff !important;
+        border: 2px solid #00d4ff !important;
         padding: 0.25rem 0.75rem !important;
         min-height: 2.5rem !important;
+        transition: all 0.3s ease !important;
     }
     
-    /* Hover-Effekt für den Logout-Button analog zum Login */
+    /* Hover-Effekt für Logout: Füllt sich leicht ein */
     div.stButton > button:hover {
+        background-color: rgba(0, 212, 255, 0.1) !important;
         border-color: #00d4ff !important;
-        color: #0e1117 !important;
-        background-color: #00b8e6 !important;
+        color: #00d4ff !important;
     }
 
-    /* Das Design des Login-Buttons (FormSubmit) lassen wir unangetastet, 
-       damit er seinen ursprünglichen Streamlit-Look behält. */
+    /* Der Login-Button (FormSubmit) wird NICHT durch CSS verändert und behält den Standard-Look */
 
     .stTextInput>div>div>input, .stSelectbox>div>div>div { background-color: #1a1c23 !important; color: #00d4ff !important; border: 1px solid #00d4ff !important; }
     [data-testid="stSidebar"] { background-color: #0e1117 !important; border-right: 1px solid #333; }
