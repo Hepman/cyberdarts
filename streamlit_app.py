@@ -10,11 +10,11 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# Meta-Tags für Google Snippets & Social Media Vorschau
+# Meta-Tags für Google & CSS für das Cyber-Design
 st.markdown("""
 <head>
     <title>CyberDarts - Dein faires Elo-Ranking</title>
-    <meta name="description" content="Das unabhängige Ranking für Autodarts Spieler. Mit Leg-Gewichtung für faire Punkte. Melde deine Matches und steige in der CyberDarts Community!">
+    <meta name="description" content="Das unabhängige Ranking für Autodarts Spieler. Mit Leg-Gewichtung für faire Punkte.">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <style>
@@ -22,11 +22,7 @@ st.markdown("""
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3, h4 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    [data-testid="stTable"] thead tr th, [data-testid="stDataFrame"] th, [role="columnheader"] p {
-        color: #00d4ff !important;
-        font-weight: bold !important;
-    }
-
+    /* Outline Buttons */
     .stButton>button { 
         background-color: transparent !important; 
         color: #00d4ff !important; 
@@ -38,6 +34,7 @@ st.markdown("""
     }
     .stButton>button:hover { background-color: rgba(0, 212, 255, 0.1) !important; }
 
+    /* Input Felder */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #1a1c23 !important;
         color: #00d4ff !important;
@@ -48,15 +45,9 @@ st.markdown("""
         background-color: #0e1117 !important;
         border-right: 1px solid #333;
     }
-    
-    /* Style für den Match-Link Icon */
-    .match-link {
-        text-decoration: none;
-        color: #00d4ff !important;
-        font-size: 1.2em;
-        vertical-align: middle;
-        margin-left: 10px;
-    }
+
+    /* Link Style */
+    .match-link { text-decoration: none; color: #00d4ff !important; margin-left: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -86,8 +77,7 @@ def get_trend(username, match_df):
         return "⚪" * 10
     u_m = match_df[(match_df['winner_name'] == username) | (match_df['loser_name'] == username)]
     icons = ["🟢" if m['winner_name'] == username else "🔴" for _, m in u_m.tail(10).iloc[::-1].iterrows()]
-    res = "".join(icons)
-    return res.ljust(10, "⚪")[:10]
+    return "".join(icons).ljust(10, "⚪")[:10]
 
 # --- 4. DATEN LADEN ---
 players = conn.table("profiles").select("*").execute().data or []
@@ -98,27 +88,22 @@ m_df = pd.DataFrame(matches_data) if matches_data else pd.DataFrame(columns=['id
 with st.sidebar:
     st.title("🎯 Menü")
     if st.session_state.user:
-        u_email = str(st.session_state.user.email).strip().lower()
         st.write(f"Eingeloggt: **{st.session_state.user.user_metadata.get('username')}**")
         if st.button("Abmelden"):
-            conn.client.auth.sign_out()
-            st.session_state.user = None
-            st.rerun()
+            conn.client.auth.sign_out(); st.session_state.user = None; st.rerun()
     else:
-        with st.form("login_form"):
+        with st.form("login"):
             le, lp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
                 try:
                     res = conn.client.auth.sign_in_with_password({"email": le.strip().lower(), "password": lp})
-                    st.session_state.user = res.user
-                    st.rerun()
-                except: st.error("Login fehlgeschlagen.")
-    
+                    st.session_state.user = res.user; st.rerun()
+                except: st.error("Fehler")
     st.divider()
     st.subheader("⚖️ Impressum")
     st.write("Sascha Heptner  \nRömerstr. 1, 79725 Laufenburg  \nE-Mail: sascha@cyberdarts.de")
     st.subheader("🛡️ Datenschutz")
-    st.write("Diese App speichert nur notwendige Daten (Username, E-Mail, Ergebnisse) zur Erstellung des Rankings. Hosting via Streamlit & Supabase.")
+    st.write("Speicherung nur notwendiger Daten.")
     st.divider()
     st.caption("CyberDarts © 2026")
 
@@ -131,34 +116,21 @@ with t1:
     if players:
         st.write("🟢 Sieg | 🔴 Niederlage | ⚪ Offen")
         df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
-        df_players['Trend'] = df_players['username'].apply(lambda x: get_trend(x, m_df))
-        df_display = df_players[["username", "elo_score", "Trend"]].rename(columns={"username": "Spieler", "elo_score": "Elo"})
-        df_display.insert(0, "Rang", range(1, len(df_display) + 1))
-        
-        col_l, col_m, col_r = st.columns([1, 4, 1])
+        col_l, col_m, col_r = st.columns([1, 2, 1])
         with col_m:
-            st.dataframe(
-                df_display, 
-                hide_index=True, 
-                use_container_width=True,
-                column_config={
-                    "Rang": st.column_config.Column(width="small"),
-                    "Elo": st.column_config.NumberColumn(format="%d"),
-                    "Trend": st.column_config.Column(width="medium")
-                }
-            )
+            # Markdown Tabelle für zentrierte Zahlen und Cyber-Look
+            md_table = "| Rang | Spieler | Elo | Trend |\n| :---: | :--- | :---: | :--- |\n"
+            for i, row in enumerate(df_players.itertuples(), 1):
+                trend = get_trend(row.username, m_df)
+                md_table += f"| {i} | {row.username} | **{row.elo_score}** | {trend} |\n"
+            st.markdown(md_table)
 
 with t2:
-    if not st.session_state.user:
-        st.warning("Bitte einloggen.")
+    if not st.session_state.user: st.warning("Bitte einloggen.")
     else:
         curr_name = st.session_state.user.user_metadata.get('username')
-        st.info(f"Hi **{curr_name}**! Trage hier dein letztes Match ein.")
-        
         st.code("GG! Registrier dich kurz auf cyberdarts.de mit deinem Namen, damit du auch im Elo-Ranking landest! 🎯", language=None)
-        
         url = st.text_input("Autodarts Match Link", placeholder="https://play.autodarts.io/history/matches/xxxxx")
-        
         if url:
             m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_match:
@@ -166,73 +138,59 @@ with t2:
                 if not any(m['id'] == mid for m in matches_data):
                     p_map = {p['username']: p for p in players}
                     all_names = sorted(p_map.keys())
-                    
-                    st.write("### Wer hat gewonnen?")
                     winner_opt = st.radio("Gewinner wählen:", [curr_name, "Jemand anderes"], horizontal=True)
-                    
-                    if winner_opt == curr_name:
-                        w_name = curr_name
-                        l_name = st.selectbox("Gegner (Verlierer) wählen:", [n for n in all_names if n != curr_name], index=None)
-                    else:
-                        l_name = curr_name
-                        w_name = st.selectbox("Gegner (Gewinner) wählen:", [n for n in all_names if n != curr_name], index=None)
-
+                    w_name = curr_name if winner_opt == curr_name else st.selectbox("Gegner (Gewinner):", [n for n in all_names if n != curr_name], index=None)
+                    l_name = curr_name if winner_opt != curr_name else st.selectbox("Gegner (Verlierer):", [n for n in all_names if n != curr_name], index=None)
                     if w_name and l_name:
-                        st.write("### Ergebnis (Legs)")
-                        col1, col2 = st.columns(2)
-                        w_legs = col1.number_input(f"Legs für {w_name}", min_value=1, max_value=21, value=3)
-                        l_legs = col2.number_input(f"Legs für {l_name}", min_value=0, max_value=20, value=0)
-                        
+                        c1, c2 = st.columns(2)
+                        w_legs = c1.number_input(f"Legs {w_name}", min_value=1, max_value=21, value=3)
+                        l_legs = c2.number_input(f"Legs {l_name}", min_value=0, max_value=20, value=0)
                         if st.button("🔥 Match jetzt offiziell melden"):
                             if w_legs > l_legs:
                                 pw, pl = p_map[w_name], p_map[l_name]
-                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'], w_legs, l_legs)
+                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pw['games_played'], w_legs, l_legs)
                                 conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
                                 conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                                 conn.table("matches").insert({"id": mid, "winner_name": w_name, "loser_name": l_name, "elo_diff": d, "url": url, "winner_legs": w_legs, "loser_legs": l_legs}).execute()
-                                st.success("Match erfolgreich verbucht!")
-                                st.balloons()
-                                st.rerun()
-                            else: st.error("Der Gewinner muss mehr Legs haben!")
-                else:
-                    st.warning("Dieses Match wurde bereits gemeldet.")
+                                st.success("Verbucht!"); st.rerun()
+                            else: st.error("Gewinner braucht mehr Legs!")
 
 with t3:
     st.write("### 📅 Historie (Letzte 15)")
     if not m_df.empty:
-        # Wir gehen die letzten 15 Matches rückwärts durch
         for m in matches_data[::-1][:15]:
             score = f"({m.get('winner_legs', 3)}:{m.get('loser_legs', 0)})"
-            match_url = m.get('url', '#')
-            
-            # Zeile mit Match-Details und klickbarem Icon
-            st.markdown(f"""
-                **{m['winner_name']}** {score} vs **{m['loser_name']}** | 
-                <span style='color: #00d4ff; font-weight: bold;'>+{m['elo_diff']} Elo</span>
-                <a href='{match_url}' target='_blank' class='match-link' title='Match auf Autodarts prüfen'>🔗</a>
-            """, unsafe_allow_html=True)
+            st.markdown(f"**{m['winner_name']}** {score} vs **{m['loser_name']}** | <span style='color:#00d4ff;'>+{m['elo_diff']} Elo</span> <a href='{m.get('url','#')}' target='_blank' class='match-link'>🔗</a>", unsafe_allow_html=True)
             st.divider()
 
 with t4:
-    if not st.session_state.user:
-        st.info("💡 **Hinweis:** Dein Username muss exakt mit deinem Namen bei Autodarts übereinstimmen.")
-        with st.form("reg"):
-            re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Username bei Autodarts (Exakt!)")
-            if st.form_submit_button("Registrieren"):
-                try:
-                    conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
-                    st.success("Erfolg! Bitte logge dich jetzt ein.")
-                except Exception as e: st.error(f"Fehler: {e}")
+    with st.form("reg"):
+        re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Username (Exakt!)")
+        if st.form_submit_button("Registrieren"):
+            try:
+                conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
+                st.success("Erfolg! Bitte einloggen.")
+            except: st.error("Fehler")
 
 with t5:
     st.header("📖 Anleitung & System")
-    st.write("Die Elo-Rangliste ist ein Bewertungssystem, das die relative Spielstärke von Spielern ausdrückt: Höhere Zahl = stärkerer Spieler.")
+    st.write("Die Elo-Rangliste ist ein Bewertungssystem, das die relative Spielstärke von Spielern ausdrückt: Höhere Zahl = stärkerer Spieler. Nach jedem Spiel werden Punkte zwischen den Spielern umverteilt, basierend auf dem Ergebnis im Vergleich zur erwarteten Punktzahl (die sich aus der Differenz der Elo-Zahlen ergibt) – wer mehr gewinnt als erwartet, gewinnt Elo-Punkte, wer weniger gewinnt, verliert.")
     st.subheader("Das Grundprinzip:")
-    st.write("* **Bewertung:** Jeder Spieler hat eine Zahl (Anfänger < 1000, Profis > 2000).")
-    st.write("* **Anpassung:** Wer gegen einen stärkeren Gegner gewinnt, bekommt mehr Punkte.")
+    st.write("**Bewertung:** Jeder Spieler hat eine Zahl, die seine Spielstärke repräsentiert (z. B. Anfänger < 1000, überdurchschnittlich 1400-1599).")
+    st.write("**Erwartungswert:** Aus der Differenz der Elo-Zahlen zweier Spieler wird berechnet, wie viele Punkte der eine gegen den anderen voraussichtlich holen wird (z. B. 12 Elo-Punkte Differenz = 1 Prozentpunkt Unterschied in der Gewinnerwartung).")
+    st.subheader("Anpassung:")
+    st.write("* **Gewinnt ein Spieler mehr als erwartet:** Seine Elo-Zahl steigt, da er besser als gedacht war.")
+    st.write("* **Gewinnt ein Spieler weniger als erwartet:** Seine Elo-Zahl sinkt.")
+    st.write("* **Punktetransfer:** Die Punkte werden typischerweise zwischen den Spielern umverteilt. Der Verlierer gibt Punkte an den Gewinner ab.")
+    st.write("* **Anwendung:** Das System wird in vielen Spielen genutzt, um die Spielstärke zu vergleichen und faire Matches zu ermöglichen, da es die Spielstärke objektiv abbildet.")
+    st.subheader("Einfaches Beispiel:")
+    st.write("Spieler A (1600 Elo) spielt gegen Spieler B (1400 Elo).")
+    st.write("Erwartung: Spieler A wird voraussichtlich mehr Punkte erzielen.")
+    st.write("* **Gewinnt A:** Seine Zahl steigt leicht, B verliert leicht.")
+    st.write("* **Gewinnt B (Überraschung!):** A verliert viele Punkte, B gewinnt viele Punkte.")
     st.divider()
     st.subheader("🎯 CyberDarts Spezial: Leg-Gewichtung")
-    st.write("Um die Dominanz zu belohnen, nutzen wir Multiplikatoren:")
-    st.write("* **3:0 Sieg:** 120% Elo-Gewinn")
-    st.write("* **3:1 Sieg:** 100% Elo-Gewinn")
-    st.write("* **3:2 Sieg:** 80% Elo-Gewinn")
+    st.write("Um die Dominanz in einem Match zu belohnen, nutzt CyberDarts zusätzlich einen Multiplikator für das Leg-Ergebnis:")
+    st.write("* **3:0 Sieg:** 120% Elo-Gewinn (Dominanz-Bonus)")
+    st.write("* **3:1 Sieg:** 100% Elo-Gewinn (Standard)")
+    st.write("* **3:2 Sieg:** 80% Elo-Gewinn (Knapper Sieg)")
