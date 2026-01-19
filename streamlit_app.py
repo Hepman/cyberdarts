@@ -4,19 +4,19 @@ import pandas as pd
 import re
 
 # --- 1. SETUP & SEO OPTIMIERUNG ---
-# Hier definieren wir die Meta-Daten für Google
 st.set_page_config(
     page_title="CyberDarts | Unabhängige Darts-Rangliste für Autodarts Spieler", 
     layout="wide", 
     page_icon="🎯"
 )
 
-# Zusätzliche Meta-Tags für die Google-Beschreibung (SEO)
+# Gezielte Meta-Tags für Google Snippets
 st.markdown("""
 <head>
-    <meta name="description" content="Unahängige Darts-Rangliste für Autodarts Spieler">
-    <meta name="keywords" content="Autodarts, Darts, Elo, Rangliste, CyberDarts">
-    <meta name="author" content="Sascha Heptner">
+    <title>CyberDarts - Unabhängige Darts-Rangliste</title>
+    <meta name="description" content="Unabhängige Darts-Rangliste für Autodarts Spieler. Verfolge deine Elo-Punkte, analysiere deine Form und steige im Community-Ranking auf.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://cyberdarts.de">
 </head>
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
@@ -153,7 +153,7 @@ with t2:
                             wl, ll = int(wl_r), int(ll_r)
                             if w_n != l_n and wl > ll:
                                 pw, pl = p_map[w_n], p_map[l_n]
-                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'], wl, ll)
+                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pw['games_played'], wl, ll)
                                 conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
                                 conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                                 conn.table("matches").insert({"id": mid, "winner_name": w_n, "loser_name": l_n, "elo_diff": d, "url": url, "winner_legs": wl, "loser_legs": ll}).execute()
