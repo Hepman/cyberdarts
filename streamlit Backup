@@ -10,47 +10,37 @@ st.set_page_config(
     page_icon="🎯"
 )
 
-# SEO Meta-Tags & Gezieltes CSS für den Logout-Button (Outline Design)
+# CSS für das Cyber-Design
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
-    h1, h2, h3 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
+    h1, h2, h3, h4 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    /* Logout-Button: Transparent mit Rahmen (Outline) */
-    div.stButton > button {
-        background-color: transparent !important;
-        color: #00d4ff !important;
-        font-weight: bold !important;
-        width: 100% !important;
-        border-radius: 8px !important;
+    /* Outline Buttons */
+    .stButton>button { 
+        background-color: transparent !important; 
+        color: #00d4ff !important; 
+        font-weight: bold !important; 
+        width: 100%; 
+        border-radius: 5px; 
         border: 2px solid #00d4ff !important;
-        padding: 0.25rem 0.75rem !important;
-        min-height: 2.5rem !important;
-        transition: all 0.3s ease !important;
+        transition: 0.3s;
     }
-    
-    /* Hover-Effekt für Logout: Füllt sich leicht ein */
-    div.stButton > button:hover {
-        background-color: rgba(0, 212, 255, 0.1) !important;
-        border-color: #00d4ff !important;
+    .stButton>button:hover { background-color: rgba(0, 212, 255, 0.1) !important; }
+
+    /* Input Felder */
+    .stTextInput>div>div>input, .stSelectbox>div>div>div {
+        background-color: #1a1c23 !important;
         color: #00d4ff !important;
+        border: 1px solid #00d4ff !important;
     }
 
-    /* Der Login-Button (FormSubmit) wird NICHT durch CSS verändert und behält den Standard-Look */
-
-    .stTextInput>div>div>input, .stSelectbox>div>div>div { background-color: #1a1c23 !important; color: #00d4ff !important; border: 1px solid #00d4ff !important; }
-    [data-testid="stSidebar"] { background-color: #0e1117 !important; border-right: 1px solid #333; }
-    
-    .legend-box, .rule-box, .info-card { background-color: #1a1c23; padding: 15px; border-radius: 8px; border-left: 5px solid #00d4ff; margin-bottom: 20px; }
-    .badge { background-color: #00d4ff; color: #0e1117; padding: 2px 8px; border-radius: 10px; font-weight: bold; font-size: 0.8em; }
-    .stTabs [data-baseweb="tab"] { color: #888 !important; }
-    .stTabs [aria-selected="true"] { color: #00d4ff !important; border-bottom-color: #00d4ff !important; }
+    [data-testid="stSidebar"] {
+        background-color: #0e1117 !important;
+        border-right: 1px solid #333;
+    }
 </style>
-<div style="text-align: center;">
-    <h1>🎯 CyberDarts Community Ranking</h1>
-    <p style="font-size: 1.1rem; color: #00d4ff; font-weight: 500;">Unabhängiges Leaderboard für Autodarts-Spieler</p>
-</div>
 """, unsafe_allow_html=True)
 
 # --- 2. DATENBANK-VERBINDUNG ---
@@ -64,14 +54,6 @@ conn = init_connection()
 
 if "user" not in st.session_state:
     st.session_state.user = None
-
-if st.session_state.user is None:
-    try:
-        session = conn.auth.get_session()
-        if session:
-            st.session_state.user = session.user
-    except:
-        pass
 
 # --- 3. HELPER FUNKTIONEN ---
 def calculate_elo_advanced(rating_w, rating_l, games_w, games_l, winner_legs, loser_legs):
@@ -101,111 +83,121 @@ m_df = pd.DataFrame(matches_data) if matches_data else pd.DataFrame(columns=['id
 with st.sidebar:
     st.title("🎯 Menü")
     if st.session_state.user:
-        st.write(f"Login: **{st.session_state.user.email}**")
+        u_email = str(st.session_state.user.email).strip().lower()
+        st.write(f"Eingeloggt: **{u_email}**")
         if st.button("Abmelden"):
-            conn.auth.sign_out()
+            conn.client.auth.sign_out()
             st.session_state.user = None
             st.rerun()
     else:
         with st.form("login_form"):
-            le = st.text_input("E-Mail").strip().lower()
-            lp = st.text_input("Passwort", type="password")
+            le, lp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
             if st.form_submit_button("Einloggen"):
-                if le and lp:
-                    try:
-                        auth_res = conn.auth.sign_in_with_password({"email": le, "password": lp})
-                        if auth_res.user:
-                            st.session_state.user = auth_res.user
-                            st.rerun()
-                    except Exception as e:
-                        session_check = conn.auth.get_session()
-                        if session_check:
-                            st.session_state.user = session_check.user
-                            st.rerun()
-                        else:
-                            st.error("Login fehlgeschlagen.")
-                else:
-                    st.warning("Bitte E-Mail und Passwort eingeben.")
+                try:
+                    res = conn.client.auth.sign_in_with_password({"email": le.strip().lower(), "password": lp})
+                    st.session_state.user = res.user
+                    st.rerun()
+                except: st.error("Login fehlgeschlagen.")
+    
+    st.divider()
+    st.subheader("⚖️ Impressum")
+    st.write("Sascha Heptner  \nRömerstr. 1, 79725 Laufenburg  \nE-Mail: sascha@cyberdarts.de")
+    st.subheader("🛡️ Datenschutz")
+    st.write("Diese App speichert nur notwendige Daten (Username, E-Mail, Ergebnisse) zur Erstellung des Rankings. Hosting via Streamlit & Supabase.")
+    st.divider()
+    st.caption("CyberDarts © 2026")
 
-    st.markdown("---")
-    with st.expander("⚖️ Impressum & Rechtliches"):
-        st.caption(f"""
-        **Verantwortlich:** Sascha Heptner  
-        Römerstr. 1  
-        79725 Laufenburg  
-        sascha@cyberdarts.de  
-        
-        CyberDarts © 2026
-        """)
+# --- 6. HAUPTSEITE ---
+st.title("🎯 CyberDarts Community Ranking")
 
-# --- 6. TABS ---
 t1, t2, t3, t4, t5 = st.tabs(["🏆 Rangliste", "⚔️ Match melden", "📅 Historie", "👤 Registrierung", "📖 Anleitung"])
 
 with t1:
-    col_main, col_rules = st.columns([2, 1])
-    with col_main:
-        if players:
-            st.markdown('<div class="legend-box">🟢 Sieg | 🔴 Niederlage | ⚪ Offen</div>', unsafe_allow_html=True)
-            df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
-            html = '<table style="width:100%; color:#00d4ff; border-collapse: collapse;">'
-            html += '<tr style="border-bottom:2px solid #00d4ff; text-align:left;"><th>Rang</th><th>Spieler</th><th>Elo</th><th>Trend</th></tr>'
-            for i, r in enumerate(df_players.itertuples(), 1):
-                icon = "🥇" if i==1 else "🥈" if i==2 else "🥉" if i==3 else f"{i}."
-                trend = get_trend(r.username, m_df)
-                html += f'<tr style="border-bottom:1px solid #1a1c23;"><td>{icon}</td><td>{r.username}</td><td>{r.elo_score}</td><td style="letter-spacing:2px;">{trend}</td></tr>'
-            st.markdown(html + '</table>', unsafe_allow_html=True)
-    with col_rules:
-        st.markdown('<div class="rule-box"><h3>📜 Kurzregeln</h3>501 SI/DO | Bo5<br>Bull-Out startet Match<br>KI-Referee Pflicht</div>', unsafe_allow_html=True)
+    if players:
+        st.write("🟢 Sieg | 🔴 Niederlage | ⚪ Offen")
+        df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
+        
+        # Zentrierung durch Spalten
+        col_l, col_m, col_r = st.columns([1, 2, 1])
+        with col_m:
+            # Manuelle Markdown-Tabelle für perfekte Kontrolle
+            md_table = "| Rang | Spieler | Elo | Trend |\n| :---: | :--- | :---: | :--- |\n"
+            for i, row in enumerate(df_players.itertuples(), 1):
+                trend = get_trend(row.username, m_df)
+                md_table += f"| {i} | {row.username} | **{row.elo_score}** | {trend} |\n"
+            st.markdown(md_table)
 
 with t2:
     if not st.session_state.user: st.warning("Bitte erst einloggen.")
     else:
         if "booking_success" not in st.session_state: st.session_state.booking_success = False
-        url = st.text_input("AutoDarts Match Link")
+        url = st.text_input("Autodarts Match Link", placeholder="https://play.autodarts.io/history/matches/xxxxx")
         if url:
-            m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
+            m_id_match = re.search(r'([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', url.lower())
             if m_id_match:
                 mid = m_id_match.group(1)
                 if not any(m['id'] == mid for m in matches_data) and not st.session_state.booking_success:
                     p_map = {p['username']: p for p in players}
-                    w = st.selectbox("Gewinner", sorted(p_map.keys()))
-                    l = st.selectbox("Verlierer", sorted(p_map.keys()))
-                    
+                    sorted_names = sorted(p_map.keys())
+                    w_n = st.selectbox("Gewinner", options=sorted_names, index=None, placeholder="Wer hat gewonnen?")
+                    curr_n = st.session_state.user.user_metadata.get('username', '')
+                    d_idx = sorted_names.index(curr_n) if curr_n in sorted_names else None
+                    l_n = st.selectbox("Verlierer", options=sorted_names, index=d_idx, placeholder="Wer hat verloren?")
                     c1, c2 = st.columns(2)
-                    w_legs = c1.number_input("Legs Gewinner", 3, 21, 3)
-                    l_legs = c2.number_input("Legs Verlierer", 0, 20, 0)
-                    
+                    opts = [str(i) for i in range(22)]
+                    wl_r = c1.selectbox("Legs Gewinner", options=opts, index=None, placeholder="-")
+                    ll_r = c2.selectbox("Legs Verlierer", options=opts, index=None, placeholder="-")
                     if st.button("Ergebnis jetzt buchen"):
-                        if w != l and w_legs > l_legs:
-                            pw, pl = p_map[w], p_map[l]
-                            nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'], w_legs, l_legs)
-                            conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
-                            conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
-                            conn.table("matches").insert({"id": mid, "winner_name": w, "loser_name": l, "elo_diff": d, "url": url, "winner_legs": w_legs, "loser_legs": l_legs}).execute()
-                            st.session_state.booking_success = True; st.rerun()
-                        else: st.error("Prüfe die Angaben.")
+                        if w_n and l_n and wl_r and ll_r:
+                            wl, ll = int(wl_r), int(ll_r)
+                            if w_n != l_n and wl > ll:
+                                pw, pl = p_map[w_n], p_map[l_n]
+                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pw['games_played'], wl, ll)
+                                conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
+                                conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
+                                conn.table("matches").insert({"id": mid, "winner_name": w_n, "loser_name": l_n, "elo_diff": d, "url": url, "winner_legs": wl, "loser_legs": ll}).execute()
+                                st.session_state.booking_success = True; st.rerun()
                 elif st.session_state.booking_success:
-                    st.success("✅ Match verbucht!"); 
-                    if st.button("Nächstes Match melden"): st.session_state.booking_success = False; st.rerun()
+                    st.success("✅ Match verbucht!")
+                    if st.button("Nächstes Match"): st.session_state.booking_success = False; st.rerun()
 
 with t3:
     st.write("### 📅 Historie (Letzte 15)")
     if not m_df.empty:
         for m in matches_data[::-1][:15]:
-            leg_info = f"({m.get('winner_legs', 3)}:{m.get('loser_legs', 0)})" if 'winner_legs' in m else ""
-            st.markdown(f"**{m['winner_name']}** {leg_info} vs {m['loser_name']} <span class='badge'>+{m['elo_diff']} Elo</span>", unsafe_allow_html=True)
+            score = f"({m.get('winner_legs', 3)}:{m.get('loser_legs', 0)})"
+            st.write(f"**{m['winner_name']}** {score} vs {m['loser_name']} | **+{m['elo_diff']} Elo**")
             st.divider()
 
 with t4:
     if not st.session_state.user:
         with st.form("reg"):
-            re, rp = st.text_input("E-Mail"), st.text_input("Passwort", type="password")
-            ru = st.text_input("Dein Name bei Autodarts")
+            re, rp, ru = st.text_input("E-Mail"), st.text_input("Passwort", type="password"), st.text_input("Username bei Autodarts")
             if st.form_submit_button("Registrieren"):
                 try:
-                    conn.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
+                    conn.client.auth.sign_up({"email": re, "password": rp, "options": {"data": {"username": ru}}})
                     st.success("Erfolg! Bitte einloggen.")
                 except Exception as e: st.error(f"Fehler: {e}")
 
 with t5:
-    st.markdown('<div class="info-card"><h3>🎯 System-Info</h3>Dieses Ranking nutzt ein gewichtetes Elo-System. Deutliche Siege (3:0) bringen mehr Punkte als knappe (3:2).</div>', unsafe_allow_html=True)
+    st.header("📖 Anleitung & System")
+    st.write("Die Elo-Rangliste ist ein Bewertungssystem, das die relative Spielstärke von Spielern in einem Spiel (wie Schach oder Tischtennis) durch eine Zahl (die Elo-Zahl) ausdrückt: Höhere Zahl = stärkerer Spieler. Nach jedem Spiel werden Punkte zwischen den Spielern umverteilt, basierend auf dem Ergebnis im Vergleich zur erwarteten Punktzahl (die sich aus der Differenz der Elo-Zahlen ergibt) – wer mehr gewinnt als erwartet, gewinnt Elo-Punkte, wer weniger gewinnt, verliert.")
+    st.subheader("Das Grundprinzip:")
+    st.write("**Bewertung:** Jeder Spieler hat eine Zahl, die seine Spielstärke repräsentiert (z. B. Anfänger < 1000, überdurchschnittlich 1400-1599).")
+    st.write("**Erwartungswert:** Aus der Differenz der Elo-Zahlen zweier Spieler wird berechnet, wie viele Punkte der eine gegen den anderen voraussichtlich holen wird (z. B. 12 Elo-Punkte Differenz = 1 Prozentpunkt Unterschied in der Gewinnerwartung).")
+    st.subheader("Anpassung:")
+    st.write("* **Gewinnt ein Spieler mehr als erwartet:** Seine Elo-Zahl steigt, da er besser als gedacht war.")
+    st.write("* **Gewinnt ein Spieler weniger als erwartet:** Seine Elo-Zahl sinkt.")
+    st.write("* **Punktetransfer:** Die Punkte werden typischerweise zwischen den Spielern umverteilt. Der Verlierer gibt Punkte an den Gewinner ab.")
+    st.write("* **Anwendung:** Das System wird in vielen Spielen genutzt, um die Spielstärke zu vergleichen und faire Matches zu ermöglichen, da es die Spielstärke objektiv abbildet.")
+    st.subheader("Einfaches Beispiel:")
+    st.write("Spieler A (1600 Elo) spielt gegen Spieler B (1400 Elo).")
+    st.write("Erwartung: Spieler A wird voraussichtlich mehr Punkte erzielen.")
+    st.write("* **Gewinnt A:** Seine Zahl steigt leicht, B verliert leicht.")
+    st.write("* **Gewinnt B (Überraschung!):** A verliert viele Punkte, B gewinnt viele Punkte.")
+    st.divider()
+    st.subheader("🎯 CyberDarts Spezial: Leg-Gewichtung")
+    st.write("Um die Dominanz in einem Match zu belohnen, nutzt CyberDarts zusätzlich einen Multiplikator für das Leg-Ergebnis:")
+    st.write("* **3:0 Sieg:** 120% Elo-Gewinn (Dominanz-Bonus)")
+    st.write("* **3:1 Sieg:** 100% Elo-Gewinn (Standard)")
+    st.write("* **3:2 Sieg:** 80% Elo-Gewinn (Knapper Sieg)")
