@@ -4,20 +4,25 @@ import pandas as pd
 import re
 
 # --- 1. SETUP & SEO OPTIMIERUNG ---
+# Hier definieren wir die Meta-Daten für Google
 st.set_page_config(
-    page_title="CyberDarts | Unabhängiges Autodarts Community Ranking", 
+    page_title="CyberDarts | Unabhängige Darts-Rangliste für Autodarts Spieler", 
     layout="wide", 
     page_icon="🎯"
 )
 
-# CSS für das Cyber-Design
+# Zusätzliche Meta-Tags für die Google-Beschreibung (SEO)
 st.markdown("""
+<head>
+    <meta name="description" content="Unahängige Darts-Rangliste für Autodarts Spieler">
+    <meta name="keywords" content="Autodarts, Darts, Elo, Rangliste, CyberDarts">
+    <meta name="author" content="Sascha Heptner">
+</head>
 <style>
     .stApp { background-color: #0e1117 !important; color: #00d4ff !important; }
     p, span, label, .stMarkdown { color: #00d4ff !important; }
     h1, h2, h3, h4 { color: #00d4ff !important; text-shadow: 0 0 10px #00d4ff; }
     
-    /* Outline Buttons */
     .stButton>button { 
         background-color: transparent !important; 
         color: #00d4ff !important; 
@@ -29,7 +34,6 @@ st.markdown("""
     }
     .stButton>button:hover { background-color: rgba(0, 212, 255, 0.1) !important; }
 
-    /* Input Felder */
     .stTextInput>div>div>input, .stSelectbox>div>div>div {
         background-color: #1a1c23 !important;
         color: #00d4ff !important;
@@ -116,11 +120,8 @@ with t1:
     if players:
         st.write("🟢 Sieg | 🔴 Niederlage | ⚪ Offen")
         df_players = pd.DataFrame(players).sort_values("elo_score", ascending=False)
-        
-        # Zentrierung durch Spalten
         col_l, col_m, col_r = st.columns([1, 2, 1])
         with col_m:
-            # Manuelle Markdown-Tabelle für perfekte Kontrolle
             md_table = "| Rang | Spieler | Elo | Trend |\n| :---: | :--- | :---: | :--- |\n"
             for i, row in enumerate(df_players.itertuples(), 1):
                 trend = get_trend(row.username, m_df)
@@ -152,14 +153,11 @@ with t2:
                             wl, ll = int(wl_r), int(ll_r)
                             if w_n != l_n and wl > ll:
                                 pw, pl = p_map[w_n], p_map[l_n]
-                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pw['games_played'], wl, ll)
+                                nw, nl, d = calculate_elo_advanced(pw['elo_score'], pl['elo_score'], pw['games_played'], pl['games_played'], wl, ll)
                                 conn.table("profiles").update({"elo_score": nw, "games_played": pw['games_played']+1}).eq("id", pw['id']).execute()
                                 conn.table("profiles").update({"elo_score": nl, "games_played": pl['games_played']+1}).eq("id", pl['id']).execute()
                                 conn.table("matches").insert({"id": mid, "winner_name": w_n, "loser_name": l_n, "elo_diff": d, "url": url, "winner_legs": wl, "loser_legs": ll}).execute()
                                 st.session_state.booking_success = True; st.rerun()
-                elif st.session_state.booking_success:
-                    st.success("✅ Match verbucht!")
-                    if st.button("Nächstes Match"): st.session_state.booking_success = False; st.rerun()
 
 with t3:
     st.write("### 📅 Historie (Letzte 15)")
